@@ -69,6 +69,7 @@ class MongoPredictionRepository:
     def ensure_indexes(self, collection_name: Optional[str] = None) -> None:
         get_predictions_collection(collection_name).create_index("created_at")
         get_predictions_collection(collection_name).create_index("customer_id")
+        get_predictions_collection(collection_name).create_index("document_id")
 
     def save_predictions(self, predictions: List[Dict], collection_name: Optional[str] = None) -> int:
         if not predictions:

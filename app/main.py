@@ -18,6 +18,7 @@ from app.core.logging import setup_logging
 from app.services.batch import score_batch_documents, to_storage_documents
 from app.services.ml import MODEL_VERSION, get_model
 from app.services.report import build_pdf_report
+from app.services.auto_scorer import start_auto_scorer, stop_auto_scorer
 import os
 
 logger = setup_logging()
@@ -40,6 +41,17 @@ def load_model_on_startup():
 
     MongoPredictionRepository().ensure_indexes()
     logger.info("Ensured indexes on fraud_predictions collection")
+
+    # Start the background poller: it watches `transactions` for any
+    # documents that don't have a corresponding fraud_predictions entry
+    # yet, scores them, and saves the result — automatically, without
+    # needing a manual POST /predict call.
+    start_auto_scorer()
+
+
+@app.on_event("shutdown")
+def stop_background_workers():
+    stop_auto_scorer()
 
 
 @app.get("/")

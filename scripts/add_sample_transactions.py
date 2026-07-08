@@ -93,6 +93,19 @@ sample_records = [
         "distance_from_usual_km": 80.0,
         "mac_address": "AA:BB:CC:70:80:90",
     },
+
+    {
+        "customer_id": "CUST-TEST-R002",
+        "usage_mb": 6000.0,
+        "avg_usage_mb": 2000.0,
+        "device_age_days": 5,
+        "num_devices_30d": 17,
+        "failed_payments_7d": 1,
+        "account_age_days": 2,
+        "login_hour": 4,
+        "distance_from_usual_km": 80.0,
+        "mac_address": "AA:BB:CC:70:80:90",
+    },
 ]
 
 result = collection.insert_many(sample_records)
