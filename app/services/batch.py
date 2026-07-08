@@ -2,7 +2,8 @@
 Batch scoring helpers for MongoDB-backed transaction collections.
 """
 
-from typing import Iterable, List, Tuple
+from datetime import datetime, timezone
+from typing import Iterable, List, Tuple, Dict, Optional
 
 from app.models.schemas import (
     BatchPredictionItem,
@@ -18,12 +19,8 @@ def build_batch_summary(predictions: List[BatchPredictionItem]) -> BatchPredicti
 
     if total_records == 0:
         return BatchPredictionSummary(
-            total_records=0,
-            fraud_count=0,
-            not_fraud_count=0,
-            average_rule_score=0.0,
-            average_ml_score=0.0,
-            average_final_score=0.0,
+            total_records=0, fraud_count=0, not_fraud_count=0,
+            average_rule_score=0.0, average_ml_score=0.0, average_final_score=0.0,
         )
 
     return BatchPredictionSummary(
@@ -52,3 +49,21 @@ def score_batch_documents(documents: Iterable[dict]) -> Tuple[List[BatchPredicti
         )
 
     return predictions, build_batch_summary(predictions)
+
+
+def to_storage_documents(
+    predictions: List[BatchPredictionItem],
+    timestamp: Optional[datetime] = None,
+) -> List[Dict]:
+    """
+    Converts scored predictions into plain dicts ready to insert into
+    the fraud_predictions collection, stamping them all with the same
+    `created_at` time (the moment this batch was scored).
+    """
+    ts = timestamp or datetime.now(timezone.utc)
+    docs = []
+    for prediction in predictions:
+        doc = prediction.model_dump()
+        doc["created_at"] = ts
+        docs.append(doc)
+    return docs

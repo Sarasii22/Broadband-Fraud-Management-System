@@ -67,6 +67,52 @@
             <div class="bar" data-label="Final" style="height: 55%"></div>
           </div>
         </div>
+        <div class="card" style="grid-column: 1 / -1; margin-top: 20px;">
+          <h3>Fraud Statistics by Time Period</h3>
+          <p>Pick a time range to see everything scored and stored during that window.</p>
+
+          <form id="stats-form" class="grid-2">
+            <label>Start Time
+              <input type="datetime-local" name="start_time" required />
+            </label>
+            <label>End Time
+              <input type="datetime-local" name="end_time" required />
+            </label>
+            <button type="submit" style="grid-column: 1 / -1;">Get Statistics</button>
+          </form>
+
+          <div id="stats-summary" class="summary-grid" style="margin-top: 16px;">
+            <div class="summary-box">
+              <div class="label">Total Records</div>
+              <div class="value" id="stats-total">--</div>
+            </div>
+            <div class="summary-box">
+              <div class="label">Fraud (%)</div>
+              <div class="value" id="stats-fraud-pct">--</div>
+            </div>
+            <div class="summary-box">
+              <div class="label">Normal (%)</div>
+              <div class="value" id="stats-normal-pct">--</div>
+            </div>
+          </div>
+
+          <div id="stats-status" class="status" style="margin-top: 10px;">Choose a time range and click "Get Statistics".</div>
+
+          <div style="overflow-x: auto; margin-top: 12px;">
+            <table id="stats-table" style="width: 100%; border-collapse: collapse; display: none;">
+              <thead>
+                <tr>
+                  <th>Customer ID</th>
+                  <th>Decision</th>
+                  <th>Final Score</th>
+                  <th>Triggered Rules</th>
+                  <th>Scored At</th>
+                </tr>
+              </thead>
+              <tbody id="stats-table-body"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -77,6 +123,13 @@
       const mlScoreBox = document.getElementById('ml-score');
       const finalScoreBox = document.getElementById('final-score');
       const chart = document.getElementById('chart');
+      const statsForm = document.getElementById('stats-form');
+      const statsStatus = document.getElementById('stats-status');
+      const statsTotal = document.getElementById('stats-total');
+      const statsFraudPct = document.getElementById('stats-fraud-pct');
+      const statsNormalPct = document.getElementById('stats-normal-pct');
+      const statsTable = document.getElementById('stats-table');
+      const statsTableBody = document.getElementById('stats-table-body');
 
       function updateChart(rule, ml, final) {
         const bars = chart.querySelectorAll('.bar');
@@ -142,6 +195,52 @@
         } catch (error) {
           resultBox.innerHTML = `<div class="error">${error.message}</div>`;
         }
+      });
+      statsForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const data = Object.fromEntries(new FormData(statsForm).entries());
+        // datetime-local gives "YYYY-MM-DDTHH:mm" — that's valid ISO 8601 for FastAPI/pydantic.
+        const payload = {
+          start_time: data.start_time,
+          end_time: data.end_time,
+        };
+
+        statsStatus.textContent = 'Loading...';
+        statsTable.style.display = 'none';
+
+        try {
+          const response = await fetch('/stats/by-time', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.detail || 'Stats request failed');
+          }
+
+          statsTotal.textContent = result.total_records;
+          statsFraudPct.textContent = `${result.fraud_percentage}%`;
+          statsNormalPct.textContent = `${result.normal_percentage}%`;
+          statsStatus.textContent = `Fraud: ${result.fraud_count}  |  Normal: ${result.normal_count}`;
+
+          statsTableBody.innerHTML = result.records.map((r) => `
+            <tr>
+              <td>${r.customer_id}</td>
+              <td>${r.decision}</td>
+              <td>${r.final_score.toFixed(4)}</td>
+              <td>${r.triggered_rules.length ? r.triggered_rules.join(', ') : 'None'}</td>
+              <td>${new Date(r.created_at).toLocaleString()}</td>
+            </tr>
+          `).join('');
+
+          statsTable.style.display = result.records.length ? 'table' : 'none';
+        } catch (error) {
+          statsStatus.textContent = error.message;
+        }
+      
       });
     </script>
   </body>

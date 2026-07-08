@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -62,3 +63,38 @@ class BatchPredictionResponse(BaseModel):
     matched_count: int
     predictions: List[BatchPredictionItem]
     summary: BatchPredictionSummary
+
+
+class TimeRangeStatsRequest(BaseModel):
+    start_time: datetime = Field(
+        ..., description="Start of the period (inclusive), e.g. 2026-07-01T00:00:00"
+    )
+    end_time: datetime = Field(
+        ..., description="End of the period (inclusive), e.g. 2026-07-08T23:59:59"
+    )
+    collection_name: Optional[str] = Field(
+        default=None,
+        description="Predictions collection to query. Uses the default (fraud_predictions) when omitted.",
+    )
+
+
+class FraudRecordSummary(BaseModel):
+    customer_id: str
+    is_fraud: bool
+    decision: str
+    final_score: float
+    rule_score: float
+    ml_score: float
+    triggered_rules: List[str]
+    created_at: datetime
+
+
+class TimeRangeStatsResponse(BaseModel):
+    start_time: datetime
+    end_time: datetime
+    total_records: int
+    fraud_count: int
+    normal_count: int
+    fraud_percentage: float
+    normal_percentage: float
+    records: List[FraudRecordSummary]
