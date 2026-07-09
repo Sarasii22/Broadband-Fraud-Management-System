@@ -108,6 +108,121 @@ button {
 }
 button:hover { filter: brightness(1.08); }
 
+.secondary-button {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.customer-search-panel {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.customer-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.customer-search-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.customer-search-result {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.customer-result-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.customer-result-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.customer-result-id {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.customer-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.customer-result-grid span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.customer-result-grid strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.customer-data-section {
+  margin-top: 16px;
+}
+
+.customer-data-section h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.customer-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px;
+}
+
+.customer-data-table th,
+.customer-data-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 13px;
+  vertical-align: top;
+}
+
+.customer-data-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.empty-state {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+}
+
 .result {
   margin-top: 12px;
   padding: 14px;
@@ -211,4 +326,7 @@ button:hover { filter: brightness(1.08); }
   .dashboard-grid { grid-template-columns: 1fr; }
   .summary-grid { grid-template-columns: 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
+  .customer-search-form { grid-template-columns: 1fr; }
+  .customer-result-header { flex-direction: column; }
+  .customer-result-grid { grid-template-columns: 1fr; }
 }

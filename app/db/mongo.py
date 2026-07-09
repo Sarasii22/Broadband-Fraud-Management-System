@@ -59,6 +59,21 @@ class MongoTransactionRepository:
             doc["_id"] = str(doc["_id"])
         return documents
 
+    def fetch_transactions_by_customer_id(
+        self,
+        customer_id: str,
+        collection_name: Optional[str] = None,
+        limit: Optional[int] = None,
+    ):
+        cursor = get_collection(collection_name).find({"customer_id": customer_id}).sort("_id", -1)
+        if limit is not None:
+            cursor = cursor.limit(limit)
+
+        documents = list(cursor)
+        for doc in documents:
+            doc["_id"] = str(doc["_id"])
+        return documents
+
 
 class MongoPredictionRepository:
     """
@@ -77,6 +92,22 @@ class MongoPredictionRepository:
         collection = get_predictions_collection(collection_name)
         result = collection.insert_many(predictions)
         return len(result.inserted_ids)
+
+    def fetch_predictions_by_customer_id(
+        self,
+        customer_id: str,
+        collection_name: Optional[str] = None,
+        limit: Optional[int] = None,
+    ):
+        cursor = get_predictions_collection(collection_name).find({"customer_id": customer_id}).sort("created_at", -1)
+        if limit is not None:
+            cursor = cursor.limit(limit)
+
+        documents = list(cursor)
+        for doc in documents:
+            if "_id" in doc:
+                doc["_id"] = str(doc["_id"])
+        return documents
 
     def fetch_stats_by_time_range(
         self,

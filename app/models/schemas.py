@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class TransactionRecord(BaseModel):
@@ -110,3 +110,9 @@ class TimeRangeStatsResponse(BaseModel):
     normal_percentage: float
     records: List[FraudRecordSummary]
     rule_breakdown: List[TriggeredRuleStat] = Field(default_factory=list)
+
+
+class CustomerLookupResponse(BaseModel):
+    customer_id: str
+    transactions: List[Dict[str, Any]] = Field(default_factory=list)
+    predictions: List[Dict[str, Any]] = Field(default_factory=list)

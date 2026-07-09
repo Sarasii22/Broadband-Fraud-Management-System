@@ -9,6 +9,7 @@ from app.db.mongo import (
 from app.models.schemas import (
     BatchPredictionRequest,
     BatchPredictionResponse,
+    CustomerLookupResponse,
     TimeRangeStatsRequest,
     TimeRangeStatsResponse,
     FraudRecordSummary,
@@ -92,6 +93,31 @@ def predict_batch(request: BatchPredictionRequest):
         matched_count=len(predictions),
         predictions=predictions,
         summary=summary,
+    )
+
+
+@app.get("/customers/{customer_id}", response_model=CustomerLookupResponse)
+def get_customer_lookup(customer_id: str, limit: int = 10):
+    try:
+        transaction_repository = MongoTransactionRepository()
+        prediction_repository = MongoPredictionRepository()
+
+        transactions = transaction_repository.fetch_transactions_by_customer_id(
+            customer_id=customer_id,
+            limit=limit,
+        )
+        predictions = prediction_repository.fetch_predictions_by_customer_id(
+            customer_id=customer_id,
+            limit=limit,
+        )
+    except Exception as e:
+        logger.exception("Customer lookup failed for customer_id=%s", customer_id)
+        raise HTTPException(status_code=500, detail=f"Customer lookup failed: {e}")
+
+    return CustomerLookupResponse(
+        customer_id=customer_id,
+        transactions=transactions,
+        predictions=predictions,
     )
 
 

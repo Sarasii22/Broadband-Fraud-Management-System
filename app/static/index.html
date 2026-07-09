@@ -58,6 +58,28 @@
             Download PDF Report
           </button>
 
+          <div class="customer-search-panel">
+            <div>
+              <h3 style="margin-bottom: 4px;">Search Customer Record</h3>
+              <p style="margin-top: 0;">Enter a Customer ID to show the matching transaction data and fraud_prediction records.</p>
+            </div>
+
+            <form id="customer-search-form" class="customer-search-form">
+              <label>
+                Customer ID
+                <input type="text" name="customer_id" id="customer-search-input" placeholder="e.g. CUST-10293" />
+              </label>
+              <div class="customer-search-actions">
+                <button type="submit">Show Record</button>
+                <button type="button" id="customer-search-clear" class="secondary-button">Clear</button>
+              </div>
+            </form>
+
+            <div id="customer-search-status" class="status" style="margin-top: 10px;">Search any Customer ID to load its transaction and fraud prediction data.</div>
+
+            <div id="customer-search-result" class="customer-search-result" style="display: none;"></div>
+          </div>
+
           <!-- Triggered rules vs fraud percentage visualization -->
           <div id="rule-breakdown-section" style="display: none; margin-top: 24px;">
             <h3 style="margin-bottom: 4px;">Triggered Rules vs Fraud Percentage</h3>
@@ -93,12 +115,18 @@
       const statsTable = document.getElementById('stats-table');
       const statsTableBody = document.getElementById('stats-table-body');
       const downloadReportBtn = document.getElementById('download-report-btn');
+      const customerSearchForm = document.getElementById('customer-search-form');
+      const customerSearchInput = document.getElementById('customer-search-input');
+      const customerSearchClear = document.getElementById('customer-search-clear');
+      const customerSearchStatus = document.getElementById('customer-search-status');
+      const customerSearchResult = document.getElementById('customer-search-result');
       const ruleBreakdownSection = document.getElementById('rule-breakdown-section');
       const ruleBars = document.getElementById('rule-bars');
 
       // Keep the last-used time range so the download button can reuse it
       // without the user having to re-enter it.
       let lastRange = null;
+      let currentStatsRecords = [];
 
       // The <input type="datetime-local"> gives back a plain string like
       // "2026-07-09T14:30" with NO timezone info. The browser actually
@@ -141,6 +169,159 @@
         ruleBreakdownSection.style.display = 'block';
       }
 
+      function renderStatsTable(records) {
+        statsTableBody.innerHTML = records.map((r) => {
+          const fraudClass = r.is_fraud ? 'fraud-status-fraud' : 'fraud-status-normal';
+          const fraudLabel = r.is_fraud ? 'FRAUD' : 'NOT FRAUD';
+          return `
+            <tr>
+              <td>${r.customer_id}</td>
+              <td class="${fraudClass}">${fraudLabel}</td>
+              <td>${r.decision}</td>
+              <td>${r.final_score.toFixed(4)}</td>
+              <td>${r.triggered_rules.length ? r.triggered_rules.join(', ') : 'None'}</td>
+              <td>${new Date(r.created_at).toLocaleString()}</td>
+            </tr>
+          `;
+        }).join('');
+
+        statsTable.style.display = records.length ? 'table' : 'none';
+      }
+
+      function renderCustomerSearchResult(records, customerId) {
+        const renderTransactionRows = (transactions) => transactions.map((transaction) => `
+          <tr>
+            <td>${transaction._id || '--'}</td>
+            <td>${transaction.customer_id || '--'}</td>
+            <td>${transaction.usage_mb ?? '--'}</td>
+            <td>${transaction.avg_usage_mb ?? '--'}</td>
+            <td>${transaction.device_age_days ?? '--'}</td>
+            <td>${transaction.num_devices_30d ?? '--'}</td>
+            <td>${transaction.failed_payments_7d ?? '--'}</td>
+            <td>${transaction.account_age_days ?? '--'}</td>
+            <td>${transaction.login_hour ?? '--'}</td>
+            <td>${transaction.distance_from_usual_km ?? '--'}</td>
+            <td>${transaction.mac_address || '--'}</td>
+          </tr>
+        `).join('');
+
+        const renderPredictionRows = (predictions) => predictions.map((prediction) => {
+          const fraudClass = prediction.is_fraud ? 'fraud-status-fraud' : 'fraud-status-normal';
+          const fraudLabel = prediction.is_fraud ? 'FRAUD' : 'NOT FRAUD';
+          return `
+            <tr>
+              <td>${prediction._id || '--'}</td>
+              <td>${prediction.customer_id || '--'}</td>
+              <td class="${fraudClass}">${fraudLabel}</td>
+              <td>${prediction.decision || '--'}</td>
+              <td>${Number(prediction.final_score ?? 0).toFixed(4)}</td>
+              <td>${Number(prediction.rule_score ?? 0).toFixed(4)}</td>
+              <td>${Number(prediction.ml_score ?? 0).toFixed(4)}</td>
+              <td>${Array.isArray(prediction.triggered_rules) && prediction.triggered_rules.length ? prediction.triggered_rules.join(', ') : 'None'}</td>
+              <td>${prediction.created_at ? new Date(prediction.created_at).toLocaleString() : '--'}</td>
+            </tr>
+          `;
+        }).join('');
+
+        const transactionTable = records.transactions && records.transactions.length
+          ? `
+            <div class="customer-data-section">
+              <h4>Transaction Table Data</h4>
+              <div class="table-scroll">
+                <table class="customer-data-table">
+                  <thead>
+                    <tr>
+                      <th>Record ID</th>
+                      <th>Customer ID</th>
+                      <th>Usage MB</th>
+                      <th>Avg Usage MB</th>
+                      <th>Device Age</th>
+                      <th>Devices 30d</th>
+                      <th>Failed Payments</th>
+                      <th>Account Age</th>
+                      <th>Login Hour</th>
+                      <th>Distance KM</th>
+                      <th>MAC Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${renderTransactionRows(records.transactions)}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `
+          : '<div class="empty-state">No transaction records found for this Customer ID.</div>';
+
+        const predictionTable = records.predictions && records.predictions.length
+          ? `
+            <div class="customer-data-section">
+              <h4>Fraud Prediction Data</h4>
+              <div class="table-scroll">
+                <table class="customer-data-table">
+                  <thead>
+                    <tr>
+                      <th>Record ID</th>
+                      <th>Customer ID</th>
+                      <th>Fraud Status</th>
+                      <th>Decision</th>
+                      <th>Final Score</th>
+                      <th>Rule Score</th>
+                      <th>ML Score</th>
+                      <th>Triggered Rules</th>
+                      <th>Scored At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${renderPredictionRows(records.predictions)}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `
+          : '<div class="empty-state">No fraud prediction records found for this Customer ID.</div>';
+
+        customerSearchResult.innerHTML = `
+          <div class="customer-result-header">
+            <div>
+              <div class="customer-result-label">Selected Customer</div>
+              <div class="customer-result-id">${customerId}</div>
+            </div>
+          </div>
+          ${transactionTable}
+          ${predictionTable}
+        `;
+        customerSearchResult.style.display = 'block';
+      }
+
+      async function applyCustomerSearch(customerId) {
+        const trimmedCustomerId = customerId.trim();
+
+        if (!trimmedCustomerId) {
+          customerSearchStatus.textContent = 'Enter a Customer ID to load transaction and prediction data.';
+          customerSearchResult.style.display = 'none';
+          customerSearchResult.innerHTML = '';
+          return;
+        }
+
+        customerSearchStatus.textContent = 'Loading customer data...';
+        customerSearchResult.style.display = 'none';
+        customerSearchResult.innerHTML = '';
+
+        try {
+          const response = await fetch(`/customers/${encodeURIComponent(trimmedCustomerId)}`);
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.detail || 'Customer lookup failed');
+          }
+
+          renderCustomerSearchResult(result, trimmedCustomerId);
+          customerSearchStatus.textContent = `Loaded ${result.transactions.length} transaction record(s) and ${result.predictions.length} fraud prediction record(s) for ${trimmedCustomerId}.`;
+        } catch (error) {
+          customerSearchStatus.textContent = error.message;
+        }
+      }
+
       statsForm.addEventListener('submit', async (event) => {
         event.preventDefault();
 
@@ -174,23 +355,8 @@
           statsFraudPct.textContent = `${result.fraud_percentage}%`;
           statsNormalPct.textContent = `${result.normal_percentage}%`;
           statsStatus.textContent = `Fraud: ${result.fraud_count}  |  Normal: ${result.normal_count}`;
-
-          statsTableBody.innerHTML = result.records.map((r) => {
-            const fraudClass = r.is_fraud ? 'fraud-status-fraud' : 'fraud-status-normal';
-            const fraudLabel = r.is_fraud ? 'FRAUD' : 'NOT FRAUD';
-            return `
-              <tr>
-                <td>${r.customer_id}</td>
-                <td class="${fraudClass}">${fraudLabel}</td>
-                <td>${r.decision}</td>
-                <td>${r.final_score.toFixed(4)}</td>
-                <td>${r.triggered_rules.length ? r.triggered_rules.join(', ') : 'None'}</td>
-                <td>${new Date(r.created_at).toLocaleString()}</td>
-              </tr>
-            `;
-          }).join('');
-
-          statsTable.style.display = result.records.length ? 'table' : 'none';
+          currentStatsRecords = result.records;
+          renderStatsTable(currentStatsRecords);
           renderRuleBreakdown(result.rule_breakdown);
 
           // Show the download button once we have a valid range/result,
@@ -199,6 +365,18 @@
         } catch (error) {
           statsStatus.textContent = error.message;
         }
+      });
+
+      customerSearchForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        applyCustomerSearch(customerSearchInput.value);
+      });
+
+      customerSearchClear.addEventListener('click', () => {
+        customerSearchInput.value = '';
+        customerSearchStatus.textContent = 'Search for a Customer ID after loading statistics.';
+        customerSearchResult.style.display = 'none';
+        customerSearchResult.innerHTML = '';
       });
 
       downloadReportBtn.addEventListener('click', async () => {
