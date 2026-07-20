@@ -1,23 +1,57 @@
-from datetime import datetime
-from pydantic import BaseModel, Field
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class TransactionRecord(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id", description="MongoDB document id")
-    customer_id: str = Field(..., description="Unique customer identifier")
-    usage_mb: float = Field(..., ge=0, description="Data usage in this session/day (MB)")
-    avg_usage_mb: float = Field(..., ge=0, description="Customer's 30-day average usage (MB)")
-    device_age_days: int = Field(..., ge=0, description="Days since this device was first seen")
-    num_devices_30d: int = Field(..., ge=0, description="Distinct devices used in last 30 days")
-    failed_payments_7d: int = Field(..., ge=0, description="Failed payment attempts in last 7 days")
-    account_age_days: int = Field(..., ge=0, description="Days since account was created")
-    login_hour: int = Field(..., ge=0, le=23, description="Hour of day (0-23) of this login/event")
-    distance_from_usual_km: float = Field(..., ge=0, description="Distance from customer's usual location")
-    mac_address: str = Field(..., description="Device MAC address")
+    subscriber_id: str = Field(
+        ...,
+        validation_alias=AliasChoices("subscriber_id", "customer_id"),
+        description="Unique subscriber identifier",
+    )
+    record_opening_time: Optional[datetime] = Field(default=None, description="Session start time")
+    record_closing_time: Optional[datetime] = Field(default=None, description="Session end time")
+    cc_total_octets_bytes: Optional[int] = Field(default=None, ge=0, description="Total octets in bytes")
+    cc_input_octets_bytes: Optional[int] = Field(default=None, ge=0, description="Input octets in bytes")
+    cc_output_octets_bytes: Optional[int] = Field(default=None, ge=0, description="Output octets in bytes")
+    load_date: Optional[datetime] = Field(default=None, description="Ingestion timestamp")
 
-    class Config:
-        populate_by_name = True
+    usage_mb: Optional[float] = Field(default=None, ge=0, description="Legacy data usage in MB")
+    avg_usage_mb: Optional[float] = Field(default=None, ge=0, description="Legacy 30-day average usage in MB")
+    device_age_days: Optional[int] = Field(default=None, ge=0, description="Days since this device was first seen")
+    num_devices_30d: Optional[int] = Field(default=None, ge=0, description="Distinct devices used in last 30 days")
+    failed_payments_7d: Optional[int] = Field(default=None, ge=0, description="Failed payment attempts in last 7 days")
+    account_age_days: Optional[int] = Field(default=None, ge=0, description="Days since account was created")
+    login_hour: Optional[int] = Field(default=None, ge=0, le=23, description="Hour of day (0-23) of this login/event")
+    distance_from_usual_km: Optional[float] = Field(default=None, ge=0, description="Distance from subscriber's usual location")
+    mac_address: Optional[str] = Field(default=None, description="Device MAC address")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    def to_scoring_payload(self) -> Dict[str, Any]:
+        event_time = self.record_opening_time or self.load_date or self.record_closing_time or datetime.now(timezone.utc)
+        raw_octets = self.cc_total_octets_bytes
+        input_octets = self.cc_input_octets_bytes or 0
+        output_octets = self.cc_output_octets_bytes or 0
+        if raw_octets is None or raw_octets <= 0:
+            raw_octets = input_octets + output_octets
+
+        usage_mb = self.usage_mb if self.usage_mb is not None else round(raw_octets / (1024 * 1024), 4)
+
+        return {
+            "customer_id": self.subscriber_id,
+            "usage_mb": usage_mb,
+            "avg_usage_mb": self.avg_usage_mb if self.avg_usage_mb is not None else usage_mb,
+            "device_age_days": self.device_age_days if self.device_age_days is not None else 0,
+            "num_devices_30d": self.num_devices_30d if self.num_devices_30d is not None else 1,
+            "failed_payments_7d": self.failed_payments_7d if self.failed_payments_7d is not None else 0,
+            "account_age_days": self.account_age_days if self.account_age_days is not None else 0,
+            "login_hour": self.login_hour if self.login_hour is not None else event_time.hour,
+            "distance_from_usual_km": self.distance_from_usual_km if self.distance_from_usual_km is not None else 0.0,
+            "mac_address": self.mac_address if self.mac_address is not None else self.subscriber_id,
+        }
 
 
 class BatchPredictionRequest(BaseModel):

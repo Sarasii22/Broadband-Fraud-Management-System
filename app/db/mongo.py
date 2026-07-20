@@ -48,7 +48,7 @@ class MongoTransactionRepository:
     def fetch_transactions(self, collection_name: Optional[str] = None, customer_id: Optional[str] = None, skip: int = 0, limit: Optional[int] = None):
         query = {}
         if customer_id:
-            query["customer_id"] = customer_id
+            query["$or"] = [{"customer_id": customer_id}, {"subscriber_id": customer_id}]
 
         cursor = get_collection(collection_name).find(query).sort("_id", 1).skip(skip)
         if limit is not None:
@@ -65,7 +65,7 @@ class MongoTransactionRepository:
         collection_name: Optional[str] = None,
         limit: Optional[int] = None,
     ):
-        cursor = get_collection(collection_name).find({"customer_id": customer_id}).sort("_id", -1)
+        cursor = get_collection(collection_name).find({"$or": [{"customer_id": customer_id}, {"subscriber_id": customer_id}]}).sort("_id", -1)
         if limit is not None:
             cursor = cursor.limit(limit)
 

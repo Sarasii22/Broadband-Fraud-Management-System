@@ -29,12 +29,12 @@ class FakeCollection:
 
 
 def test_fetch_transactions_applies_customer_filter(monkeypatch):
-    fake_collection = FakeCollection([{"_id": "1", "customer_id": "CUST-1"}])
+    fake_collection = FakeCollection([{"_id": "1", "subscriber_id": "SUB-1"}])
     monkeypatch.setattr("app.db.mongo.get_collection", lambda collection_name=None: fake_collection)
 
     repository = MongoTransactionRepository()
     documents = repository.fetch_transactions(collection_name="transactions", customer_id="CUST-1", skip=2, limit=5)
 
-    assert fake_collection.last_query == {"customer_id": "CUST-1"}
+    assert fake_collection.last_query == {"$or": [{"customer_id": "CUST-1"}, {"subscriber_id": "CUST-1"}]}
     assert len(documents) == 1
-    assert documents[0]["customer_id"] == "CUST-1"
+    assert documents[0]["subscriber_id"] == "SUB-1"

@@ -38,8 +38,7 @@ def score_batch_documents(documents: Iterable[dict]) -> Tuple[List[BatchPredicti
 
     for document in documents:
         transaction = TransactionRecord.model_validate(document)
-        transaction_data = transaction.model_dump(exclude={"id"})
-        scored = score_transaction(transaction_data)
+        scored = score_transaction(transaction.to_scoring_payload())
         predictions.append(
             BatchPredictionItem(
                 document_id=str(transaction.id) if transaction.id is not None else None,

@@ -172,13 +172,25 @@ Then open:
 
 ## Adding transaction data (two supported ways)
 
-### Option 1 — Import the included synthetic dataset
+### Option 1 — Import a CSV dataset
 
 ```powershell
 python scripts\import_csv_to_mongodb.py
 ```
 
-This reads `training/synthetic_broadband_fraud_data.csv` and inserts the rows into the configured MongoDB collection.
+This reads the CSV you provide and inserts the rows into the configured MongoDB collection.
+
+If your source file uses the transaction table format you shared, the import script will preserve these raw fields:
+
+- `subscriber_id`
+- `record_opening_time`
+- `record_closing_time`
+- `cc_total_octets_bytes`
+- `cc_input_octets_bytes`
+- `cc_output_octets_bytes`
+- `load_date`
+
+For compatibility with the existing API, it also stores `customer_id` as an alias of `subscriber_id`.
 
 ### Option 2 — Insert a small hand-crafted test set
 
@@ -194,35 +206,23 @@ If you have your own data, insert documents into the `transactions` collection u
 
 ### Expected transaction fields
 
-Each MongoDB document in `transactions` should contain these fields:
+Each MongoDB document in `transactions` can use either the raw subscriber table shape or the legacy fraud-feature shape.
 
-- `customer_id`
-- `usage_mb`
-- `avg_usage_mb`
-- `device_age_days`
-- `num_devices_30d`
-- `failed_payments_7d`
-- `account_age_days`
-- `login_hour`
-- `distance_from_usual_km`
-- `mac_address`
-
-Example document:
+Raw subscriber table example:
 
 ```json
 {
-  "customer_id": "CUST-10293",
-  "usage_mb": 15230.5,
-  "avg_usage_mb": 2100.0,
-  "device_age_days": 0,
-  "num_devices_30d": 4,
-  "failed_payments_7d": 3,
-  "account_age_days": 5,
-  "login_hour": 3,
-  "distance_from_usual_km": 120.0,
-  "mac_address": "AA:BB:CC:DD:EE:FF"
+  "subscriber_id": "SUB_365EECB8",
+  "record_opening_time": "2026-05-16T11:00:00",
+  "record_closing_time": "2026-05-16T10:00:00",
+  "cc_total_octets_bytes": 0,
+  "cc_input_octets_bytes": 8094,
+  "cc_output_octets_bytes": 0,
+  "load_date": "2026-05-17T05:04:50"
 }
 ```
+
+The app derives the legacy scoring fields from this raw shape when you batch-score documents.
 
 ## How automatic scoring works
 

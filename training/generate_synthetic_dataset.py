@@ -1,103 +1,60 @@
 import os
+
 import numpy as np
 import pandas as pd
 
 OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "synthetic_broadband_fraud_data.csv")
+DEFAULT_OPENING_TIME = pd.Timestamp("2026-05-16 11:00:00")
+DEFAULT_CLOSING_TIME = pd.Timestamp("2026-05-16 10:00:00")
+DEFAULT_LOAD_DATE = pd.Timestamp("2026-05-17 05:04:50")
 
 
-def generate_broadband_synthetic_data(n_samples: int = 10000, fraud_rate: float = 0.5, seed: int = 42) -> pd.DataFrame:
+def generate_broadband_synthetic_data(n_samples: int = 1000, fraud_rate: float = 0.5, seed: int = 42) -> pd.DataFrame:
     """
-    Generate realistic synthetic broadband fraud data.
-    
-    LEGITIMATE: 1-2 GB usage, 3-6 devices (normal home broadband)
-    FRAUDSTERS: 8+ GB usage, 8+ devices (account takeover/reselling)
+    Generate subscriber transaction rows in the new MongoDB table shape.
+
+    Output columns:
+    - subscriber_id
+    - record_opening_time
+    - record_closing_time
+    - cc_total_octets_bytes
+    - cc_input_octets_bytes
+    - cc_output_octets_bytes
+    - load_date
     """
     rng = np.random.default_rng(seed)
-    n_fraud = int(n_samples * fraud_rate)
-    n_legit = n_samples - n_fraud
 
-    # ========== LEGITIMATE CUSTOMERS ==========
-    # Normal home broadband: 1-2 GB/day, 3-6 devices (laptop, phone, tablet, TV, etc)
-    legit = pd.DataFrame({
-        "customer_id": [f"CUST-L-{i:05d}" for i in range(n_legit)],
-        
-        # Usage: 1-2.5 GB (1000-2500 MB)
-        "usage_mb": rng.normal(1500, 300, n_legit).clip(800, 3000),
-        "avg_usage_mb": rng.normal(1500, 300, n_legit).clip(800, 3000),
-        
-        # Established devices (not new)
-        "device_age_days": rng.integers(30, 1200, n_legit),
-        
-        # NORMAL: 3-6 devices per home (this is NOT fraud!)
-        "num_devices_30d": rng.integers(3, 7, n_legit),
-        
-        # Payments usually successful
-        "failed_payments_7d": rng.poisson(0.1, n_legit),
-        
-        # Established accounts (90+ days old)
-        "account_age_days": rng.integers(90, 3000, n_legit),
-        
-        # Normal login hours (any time of day)
-        "login_hour": rng.choice(np.arange(0, 24), size=n_legit, 
-                                  p=[0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.04, 0.04, 
-                                     0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 
-                                     0.05, 0.05, 0.05, 0.04, 0.04, 0.04, 0.04, 0.03]),
-        
-        # Usual location (within 30 km)
-        "distance_from_usual_km": rng.exponential(3, n_legit).clip(0, 50),
-        
-        # Normal MAC addresses
-        "mac_address": [f"AA:BB:CC:{rng.integers(0, 255):02X}:{rng.integers(0, 255):02X}:{rng.integers(0, 255):02X}" 
-                        for _ in range(n_legit)],
-        "label": 0,
-    })
+    base_ids = [f"SUB_{rng.integers(0, 16**8):08X}" for _ in range(n_samples)]
 
-    # ========== FRAUDSTERS ==========
-    # Account takeover: 8-20 GB usage, 8+ devices (reselling to many people)
-    fraud = pd.DataFrame({
-        "customer_id": [f"CUST-F-{i:05d}" for i in range(n_fraud)],
-        
-        # Usage: 8-20 GB (8000-20000 MB) - massive spike
-        "usage_mb": rng.normal(12000, 4000, n_fraud).clip(5000, 30000),
-        
-        # Their "normal" average is actually normal, but current usage is abnormal
-        "avg_usage_mb": rng.normal(1500, 400, n_fraud).clip(500, 3000),
-        
-        # NEW devices (SIM swap, account takeover)
-        "device_age_days": rng.integers(0, 7, n_fraud),
-        
-        # MANY devices (8+) - selling account to multiple people
-        "num_devices_30d": rng.integers(8, 20, n_fraud),
-        
-        # Multiple failed payments (testing stolen cards)
-        "failed_payments_7d": rng.poisson(3, n_fraud) + 1,
-        
-        # Brand new accounts (subscription fraud)
-        "account_age_days": rng.integers(0, 45, n_fraud),
-        
-        # ODD hours (2-5 AM, late night)
-        "login_hour": rng.choice([0, 1, 2, 3, 4, 5, 23], size=n_fraud, 
-                                  p=[0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.1]),
-        
-        # Unusual location (100+ km away)
-        "distance_from_usual_km": rng.exponential(150, n_fraud).clip(50, 800),
-        
-        # Different MAC addresses (attacker's devices)
-        "mac_address": [f"FF:FF:FF:{rng.integers(0, 255):02X}:{rng.integers(0, 255):02X}:{rng.integers(0, 255):02X}" 
-                        for _ in range(n_fraud)],
-        "label": 1,
-    })
+    input_octets = rng.integers(5_000, 120_000_000, size=n_samples)
+    output_octets = rng.integers(0, 10_000_000, size=n_samples)
 
-    df = pd.concat([legit, fraud], ignore_index=True)
+    # Keep the raw data aligned with the sample you provided: the total
+    # octets field is zero and the actual usage sits in input/output.
+    total_octets = np.zeros(n_samples, dtype=np.int64)
+
+    df = pd.DataFrame(
+        {
+            "subscriber_id": base_ids,
+            "record_opening_time": [DEFAULT_OPENING_TIME] * n_samples,
+            "record_closing_time": [DEFAULT_CLOSING_TIME] * n_samples,
+            "cc_total_octets_bytes": total_octets,
+            "cc_input_octets_bytes": input_octets,
+            "cc_output_octets_bytes": output_octets,
+            "load_date": [DEFAULT_LOAD_DATE] * n_samples,
+        }
+    )
+
+    # Optional stability tweak: keep the same deterministic row ordering
+    # for a given seed, but still vary the values enough for testing.
     df = df.sample(frac=1, random_state=seed).reset_index(drop=True)
-    
-    print(f"\n=== Synthetic Data Summary ===")
+
+    print(f"\n=== Synthetic Transaction Data ===")
     print(f"Total samples: {len(df)}")
-    print(f"Legitimate: {n_legit} ({100*n_legit/len(df):.1f}%)")
-    print(f"Fraud: {n_fraud} ({100*n_fraud/len(df):.1f}%)")
-    print(f"\nLegitimate - Devices: {legit['num_devices_30d'].min()}-{legit['num_devices_30d'].max()}, Usage: {legit['usage_mb'].min():.0f}-{legit['usage_mb'].max():.0f} MB")
-    print(f"Fraud - Devices: {fraud['num_devices_30d'].min()}-{fraud['num_devices_30d'].max()}, Usage: {fraud['usage_mb'].min():.0f}-{fraud['usage_mb'].max():.0f} MB")
-    
+    print(f"Subscriber IDs: {df['subscriber_id'].iloc[0]} ... {df['subscriber_id'].iloc[-1]}")
+    print(f"Input bytes range: {df['cc_input_octets_bytes'].min()} - {df['cc_input_octets_bytes'].max()}")
+    print(f"Output bytes range: {df['cc_output_octets_bytes'].min()} - {df['cc_output_octets_bytes'].max()}")
+
     return df
 
 

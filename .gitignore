@@ -32,6 +32,7 @@ Thumbs.db
 *.log
 
 # Ignore large datasets
+*.csv
 real data/*.csv
 real data/*.parquet
 
