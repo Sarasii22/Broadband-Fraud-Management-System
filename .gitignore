@@ -38,3 +38,6 @@ real data/*.parquet
 
 # Ignore Jupyter checkpoints
 real data/.ipynb_checkpoints/
+
+# Large trained models
+models/lof_model.pkl
