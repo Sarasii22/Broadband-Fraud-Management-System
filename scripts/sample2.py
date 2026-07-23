@@ -15,97 +15,105 @@ db = client["fraud_api"]
 collection = db["transactions"]
 
 sample_records = [
-    # --- Obvious fraud patterns ---
-    {
-        "subscriber_id": "SUB-TEST-F0141",
-        "usage_mb": 1850.0,
-        "avg_usage_mb": 120.0,
-        "device_age_days": 0,
-        "num_devices_30d": 145,
-        "failed_payments_7d": 4,
-        "account_age_days": 102,
-        "login_hour": 3,
-        "distance_from_usual_km": 220.0,
-        "mac_address": "FF:FF:FF:11:22:33",
-    },
-    {
-        "subscriber_id": "SUB-TEST-F0151",
-        "usage_mb": 2200.0,
-        "avg_usage_mb": 1500.0,
-        "device_age_days": 121,
-        "num_devices_30d": 12,
-        "failed_payments_7d": 3,
-        "account_age_days": 100,
-        "login_hour": 2,
-        "distance_from_usual_km": 300.0,
-        "mac_address": "FF:FF:FF:44:55:66",
-    },
-    {
-        # Hard-block: blacklisted MAC from your rules.yaml
-        "subscriber_id": "SUB-TEST-F0123",
-        "usage_mb": 5000.0,
-        "avg_usage_mb": 2000.0,
-        "device_age_days": 1140,
-        "num_devices_30d": 4,
-        "failed_payments_7d": 0,
-        "account_age_days": 10,
-        "login_hour": 14,
-        "distance_from_usual_km": 5.0,
-        "mac_address": "AA:BB:CC:DD:EE:FF",
-    },
 
-    # --- Obvious legitimate patterns ---
-    {
-        "subscriber_id": "SUB-TEST-L0144",
-        "usage_mb": 1400.0,
-        "avg_usage_mb": 1450.0,
-        "device_age_days": 400,
-        "num_devices_30d": 4,
-        "failed_payments_7d": 10,
-        "account_age_days": 60,
-        "login_hour": 19,
-        "distance_from_usual_km": 2.0,
-        "mac_address": "AA:BB:CC:10:20:30",
-    },
-    {
-        "subscriber_id": "SUB-TEST-L0164",
-        "usage_mb": 1800.0,
-        "avg_usage_mb": 1700.0,
-        "device_age_days": 2150,
-        "num_devices_30d": 5,
-        "failed_payments_7d": 0,
-        "account_age_days": 90,
-        "login_hour": 21,
-        "distance_from_usual_km": 1.5,
-        "mac_address": "AA:BB:CC:40:50:60",
-    },
+    # ===============================
+    # Extreme Fraud Subscriber
+    # Should trigger many rules
+    # ===============================
 
-    # --- Borderline / REVIEW-ish pattern ---
     {
-        "subscriber_id": "SUB-TEST-R0155",
-        "usage_mb": 6000.0,
-        "avg_usage_mb": 2000.0,
-        "device_age_days": 15,
-        "num_devices_30d": 427,
-        "failed_payments_7d": 1,
-        "account_age_days": 210,
-        "login_hour": 4,
-        "distance_from_usual_km": 80.0,
-        "mac_address": "AA:BB:CC:70:80:90",
+        "subscriber_id": "SUB_FRAUD_001",
+        "record_opening_time": datetime(2026, 7, 20, 10, 0, 0),
+        "record_closing_time": datetime(2026, 7, 20, 18, 0, 0),
+        "cc_total_octets_bytes": 0,
+        "cc_input_octets_bytes": 900_000_000,
+        "cc_output_octets_bytes": 500_000_000,
+        "load_date": datetime(2026, 7, 24, 5, 4, 50),
     },
 
     {
-        "subscriber_id": "SUB-TEST-R0134",
-        "usage_mb": 6000.0,
-        "avg_usage_mb": 2000.0,
-        "device_age_days": 15,
-        "num_devices_30d": 17,
-        "failed_payments_7d": 1,
-        "account_age_days": 2,
-        "login_hour": 4,
-        "distance_from_usual_km": 80.0,
-        "mac_address": "AA:BB:CC:70:80:90",
+        "subscriber_id": "SUB_FRAUD_001",
+        "record_opening_time": datetime(2026, 7, 21, 10, 0, 0),
+        "record_closing_time": datetime(2026, 7, 21, 20, 0, 0),
+        "cc_total_octets_bytes": 0,
+        "cc_input_octets_bytes": 800_000_000,
+        "cc_output_octets_bytes": 700_000_000,
+        "load_date": datetime(2026, 7, 24, 5, 4, 50),
     },
+
+
+    # ===============================
+    # Heavy Download User
+    # Rule 01,02,05
+    # ===============================
+
+    {
+        "subscriber_id": "SUB_HEAVY_001",
+        "record_opening_time": datetime(2026, 7, 22, 9, 0, 0),
+        "record_closing_time": datetime(2026, 7, 22, 15, 0, 0),
+        "cc_total_octets_bytes": 0,
+        "cc_input_octets_bytes": 700_000_000,
+        "cc_output_octets_bytes": 50_000_000,
+        "load_date": datetime(2026, 7, 24, 5, 4, 50),
+    },
+
+
+    {
+        "subscriber_id": "SUB_HEAVY_001",
+        "record_opening_time": datetime(2026, 7, 23, 9, 0, 0),
+        "record_closing_time": datetime(2026, 7, 23, 15, 0, 0),
+        "cc_total_octets_bytes": 0,
+        "cc_input_octets_bytes": 600_000_000,
+        "cc_output_octets_bytes": 40_000_000,
+        "load_date": datetime(2026, 7, 24, 5, 4, 50),
+    },
+
+
+    # ===============================
+    # Upload Abuse User
+    # Rule 03 and Rule 07
+    # ===============================
+
+    {
+        "subscriber_id": "SUB_UPLOAD_001",
+        "record_opening_time": datetime(2026, 7, 22, 22, 0, 0),
+        "record_closing_time": datetime(2026, 7, 23, 2, 0, 0),
+        "cc_total_octets_bytes": 0,
+        "cc_input_octets_bytes": 20_000_000,
+        "cc_output_octets_bytes": 300_000_000,
+        "load_date": datetime(2026, 7, 24, 5, 4, 50),
+    },
+
+
+    # ===============================
+    # Normal Subscriber
+    # No rules triggered
+    # ===============================
+
+    {
+        "subscriber_id": "SUB_NORMAL_001",
+        "record_opening_time": datetime(2026, 7, 23, 12, 0, 0),
+        "record_closing_time": datetime(2026, 7, 23, 14, 0, 0),
+        "cc_total_octets_bytes": 0,
+        "cc_input_octets_bytes": 50_000_000,
+        "cc_output_octets_bytes": 5_000_000,
+        "load_date": datetime(2026, 7, 24, 5, 4, 50),
+    },
+
+
+    # ===============================
+    # Another Normal Subscriber
+    # ===============================
+
+    {
+        "subscriber_id": "SUB_NORMAL_002",
+        "record_opening_time": datetime(2026, 7, 23, 15, 0, 0),
+        "record_closing_time": datetime(2026, 7, 23, 16, 0, 0),
+        "cc_total_octets_bytes": 0,
+        "cc_input_octets_bytes": 30_000_000,
+        "cc_output_octets_bytes": 2_000_000,
+        "load_date": datetime(2026, 7, 24, 5, 4, 50),
+    }
 ]
 
 result = collection.insert_many(sample_records)

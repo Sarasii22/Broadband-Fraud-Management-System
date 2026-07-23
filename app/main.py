@@ -22,6 +22,7 @@ from app.services.batch import (
     score_batch_documents,
     to_storage_documents,
 )
+from app.services.period_scoring import build_and_score_period
 from app.services.ml import MODEL_VERSION, get_model
 from app.services.report import build_pdf_report
 from app.services.auto_scorer import start_auto_scorer, stop_auto_scorer
@@ -37,9 +38,9 @@ async def lifespan(app: FastAPI):
     MongoPredictionRepository().ensure_indexes()
     logger.info("Ensured indexes on fraud_predictions collection")
 
-    start_auto_scorer()
+    #start_auto_scorer()
     yield
-    stop_auto_scorer()
+    #stop_auto_scorer()
 
 app = FastAPI(
     title="Broadband Fraud Batch API",
@@ -181,20 +182,27 @@ def _compute_stats(request: TimeRangeStatsRequest) -> TimeRangeStatsResponse:
 @app.post("/stats/by-time", response_model=TimeRangeStatsResponse)
 def stats_by_time(request: TimeRangeStatsRequest):
     try:
-        return _compute_stats(request)
+        return build_and_score_period(
+            start_time=request.start_time,
+            end_time=request.end_time,
+            transactions_collection_name=request.collection_name,
+        )
     except Exception as e:
-        logger.exception("Time-range stats query failed")
+        logger.exception("Build-and-score failed")
         raise HTTPException(status_code=500, detail=f"Stats query failed: {e}")
 
 
 @app.post("/stats/by-time/report")
 def stats_by_time_report(request: TimeRangeStatsRequest):
     """
-    Same data as /stats/by-time, but rendered as a downloadable PDF,
-    including a bar chart of triggered rules vs fraud percentage.
+    Same as /stats/by-time, but rendered as a downloadable PDF.
     """
     try:
-        stats = _compute_stats(request)
+        stats = build_and_score_period(
+            start_time=request.start_time,
+            end_time=request.end_time,
+            transactions_collection_name=request.collection_name,
+        )
 
         pdf_bytes = build_pdf_report(
             start_time=stats.start_time,
@@ -218,3 +226,4 @@ def stats_by_time_report(request: TimeRangeStatsRequest):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+

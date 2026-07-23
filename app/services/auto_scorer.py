@@ -79,29 +79,32 @@ def _score_new_transactions() -> None:
 
     logger.info("Auto-scorer found %d new transaction(s)", len(new_documents))
 
-    # 1. Aggregate raw transactions into subscriber profiles
-    profile_docs = build_subscriber_profiles_from_transactions(new_documents)
+    affected_subscriber_ids = {d["subscriber_id"] for d in new_documents if d.get("subscriber_id")}
 
-    # 2. Save / update subscriber profiles in `subscriber_profile` collection
+    full_docs = list(
+        transactions_collection.find({"subscriber_id": {"$in": list(affected_subscriber_ids)}})
+    )
+    for doc in full_docs:
+        doc["_id"] = str(doc["_id"])
+
+    profile_docs = build_subscriber_profiles_from_transactions(full_docs)
+
     saved_profiles = transaction_repository.save_subscriber_profiles(
         profile_docs, collection_name="subscriber_profile"
     )
-    logger.info("Auto-scorer updated %d subscriber profile(s) in subscriber_profile collection", saved_profiles)
+    logger.info("Auto-scorer updated %d subscriber profile(s)", saved_profiles)
 
-    # 3. Score the updated subscriber profiles
     predictions, _summary = score_batch_documents(profile_docs)
 
     now = datetime.now(timezone.utc)
     storage_docs = to_storage_documents(predictions, timestamp=now)
 
-    # Attach document_ids from new transactions so poller knows they are processed
-    for idx, storage_doc in enumerate(storage_docs):
-        if idx < len(new_documents):
-            storage_doc["document_id"] = str(new_documents[idx]["_id"])
+    new_ids = [d["_id"] for d in new_documents]
+    for storage_doc, new_id in zip(storage_docs, new_ids):
+        storage_doc["document_id"] = new_id
 
     saved_count = prediction_repository.save_predictions(storage_docs)
-    logger.info("Auto-scorer saved %d new predictions to fraud_predictions", saved_count)
-
+    logger.info("Auto-scorer saved %d new predictions", saved_count)
 
 def _poll_loop(stop_event: threading.Event) -> None:
     logger.info("Auto-scorer background poller started (interval=%ss)", POLL_INTERVAL_SECONDS)

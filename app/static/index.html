@@ -194,14 +194,12 @@
           <tr>
             <td>${transaction._id || '--'}</td>
             <td>${transaction.subscriber_id || '--'}</td>
-            <td>${transaction.total_download_mb ?? '--'}</td>
-            <td>${transaction.total_upload_mb ?? '--'}</td>
-            <td>${transaction.total_usage_mb ?? transaction.usage_mb ?? '--'}</td>
-            <td>${transaction.avg_usage_mb ?? '--'}</td>
-            <td>${transaction.max_usage_mb ?? '--'}</td>
-            <td>${transaction.Number_of_sessions ?? '--'}</td>
-            <td>${transaction.login_hour ?? '--'}</td>
-            <td>${transaction.mac_address || '--'}</td>
+            <td>${transaction.record_opening_time ? new Date(transaction.record_opening_time).toLocaleString() : '--'}</td>
+            <td>${transaction.record_closing_time ? new Date(transaction.record_closing_time).toLocaleString() : '--'}</td>
+            <td>${transaction.download_mb ?? '--'}</td>
+            <td>${transaction.upload_mb ?? '--'}</td>
+            <td>${transaction.total_usage_mb ?? '--'}</td>
+            <td>${transaction.load_date ? new Date(transaction.load_date).toLocaleString() : '--'}</td>
           </tr>
         `).join('');
 
@@ -234,14 +232,12 @@
                     <tr>
                       <th>Record ID</th>
                       <th>Customer ID</th>
+                      <th>Record Opened</th>
+                      <th>Record Closed</th>
                       <th>Download MB</th>
                       <th>Upload MB</th>
                       <th>Total Usage MB</th>
-                      <th>Avg Usage MB</th>
-                      <th>Max Usage MB</th>
-                      <th>Sessions</th>
-                      <th>Login Hour</th>
-                      <th>MAC Address</th>
+                      <th>Load Date</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -9,7 +9,7 @@ def _parse_args() -> ArgumentParser:
     parser = ArgumentParser(description="Import transaction rows into MongoDB.")
     parser.add_argument(
         "--csv",
-        default=str(Path(__file__).resolve().parents[1] / "training" / "synthetic_broadband_fraud_data.csv"),
+        default=str(Path(__file__).resolve().parents[1] / "training" / "dataset_small.csv"),
         help="Path to the CSV file to import.",
     )
     parser.add_argument(

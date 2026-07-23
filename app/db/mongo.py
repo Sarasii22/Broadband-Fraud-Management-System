@@ -110,6 +110,19 @@ class MongoTransactionRepository:
         for doc in documents:
             doc["_id"] = str(doc["_id"])
 
+            # Raw transactions only store byte counters. Compute the
+            # human-readable MB fields here, per record, so the dashboard
+            # has something real to show instead of "--".
+            input_bytes = doc.get("cc_input_octets_bytes", 0) or 0
+            output_bytes = doc.get("cc_output_octets_bytes", 0) or 0
+
+            download_mb = input_bytes / (1024 * 1024)
+            upload_mb = output_bytes / (1024 * 1024)
+
+            doc["download_mb"] = round(download_mb, 4)
+            doc["upload_mb"] = round(upload_mb, 4)
+            doc["total_usage_mb"] = round(download_mb + upload_mb, 4)
+
         return documents
 
     def save_subscriber_profiles(
@@ -131,6 +144,31 @@ class MongoTransactionRepository:
                 )
                 updated_count += 1
         return updated_count
+
+    def fetch_transactions_by_time_range(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        collection_name: Optional[str] = None,
+    ) -> List[Dict]:
+        """
+        Every transaction whose record_opening_time falls inside
+        [start_time, end_time]. This defines "the period" the user
+        picked on the dashboard.
+        """
+        query = {
+            "record_opening_time": {
+                "$gte": start_time,
+                "$lte": end_time,
+            }
+        }
+
+        documents = list(get_collection(collection_name).find(query))
+
+        for doc in documents:
+            doc["_id"] = str(doc["_id"])
+
+        return documents
     
 
 

@@ -74,8 +74,7 @@ def rule_based_score(data: dict) -> Tuple[float, List[str], bool]:
     if "upload_ratio" not in eval_data:
         dl = float(eval_data.get("total_download_mb", 0) or 0)
         ul = float(eval_data.get("total_upload_mb", 0) or 0)
-        eval_data["upload_ratio"] = (ul / dl * 100) if dl > 0 else 0.0
-
+        eval_data["upload_ratio"] = ul / (dl + 1)
     # -------------------------------
     # Rule 01 - Rule 07
     # -------------------------------
@@ -103,14 +102,14 @@ def rule_based_score(data: dict) -> Tuple[float, List[str], bool]:
     # Rule 08
     # -------------------------------
 
-    if "rule_08" in cfg:
-        rule = cfg["rule_08"]
-        algos = int(eval_data.get("algorithms_flagged", 0) or 0)
-        if algos >= rule["minimum_algorithms"]:
-            score += rule["points"]
-            triggered_rules.append("rule_08")
-            if rule.get("hard_block"):
-                hard_block = True
+    # if "rule_08" in cfg:
+    #     rule = cfg["rule_08"]
+    #     algos = int(eval_data.get("algorithms_flagged", 0) or 0)
+    #     if algos >= rule["minimum_algorithms"]:
+    #         score += rule["points"]
+    #         triggered_rules.append("rule_08")
+    #         if rule.get("hard_block"):
+    #             hard_block = True
 
     # -------------------------------
     # Normalize Score
