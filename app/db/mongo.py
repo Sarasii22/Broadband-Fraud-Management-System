@@ -14,7 +14,7 @@ load_dotenv(find_dotenv(), override=False)
 
 DEFAULT_MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 DEFAULT_MONGODB_DB = os.getenv("MONGODB_DB", "fraud_api")
-DEFAULT_MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "subscriber_profile")
+DEFAULT_MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "transactions")
 
 DEFAULT_PREDICTIONS_COLLECTION = os.getenv("MONGODB_PREDICTIONS_COLLECTION", "fraud_predictions")
 
@@ -111,6 +111,26 @@ class MongoTransactionRepository:
             doc["_id"] = str(doc["_id"])
 
         return documents
+
+    def save_subscriber_profiles(
+        self,
+        profiles: List[Dict],
+        collection_name: str = "subscriber_profile",
+    ) -> int:
+        if not profiles:
+            return 0
+        collection = get_database()[collection_name]
+        updated_count = 0
+        for profile in profiles:
+            sub_id = profile.get("subscriber_id")
+            if sub_id:
+                collection.update_one(
+                    {"subscriber_id": sub_id},
+                    {"$set": profile},
+                    upsert=True
+                )
+                updated_count += 1
+        return updated_count
     
 
 
@@ -248,7 +268,11 @@ class MongoPredictionRepository:
 
                                 "label": 1,
 
+                                "is_fraud": 1,
+
                                 "fraud_score": 1,
+
+                                "ml_score": 1,
 
                                 "raw_score": 1,
 

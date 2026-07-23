@@ -19,8 +19,17 @@ from typing import Set
 from bson import ObjectId
 
 from app.core.logging import setup_logging
-from app.db.mongo import get_collection, get_predictions_collection, MongoPredictionRepository
-from app.services.batch import score_batch_documents, to_storage_documents
+from app.db.mongo import (
+    get_collection,
+    get_predictions_collection,
+    MongoTransactionRepository,
+    MongoPredictionRepository,
+)
+from app.services.batch import (
+    build_subscriber_profiles_from_transactions,
+    score_batch_documents,
+    to_storage_documents,
+)
 
 logger = setup_logging()
 
@@ -51,7 +60,8 @@ def _get_already_scored_object_ids() -> Set[ObjectId]:
 
 
 def _score_new_transactions() -> None:
-    transactions_collection = get_collection()
+    transactions_collection = get_collection("transactions")
+    transaction_repository = MongoTransactionRepository()
     prediction_repository = MongoPredictionRepository()
 
     already_scored = _get_already_scored_object_ids()
@@ -64,18 +74,30 @@ def _score_new_transactions() -> None:
     if not new_documents:
         return
 
-    # Convert ObjectId -> str so TransactionRecord (which expects a str
-    # for its "_id"-aliased id field) validates correctly — the same
-    # conversion MongoTransactionRepository.fetch_transactions() does.
     for doc in new_documents:
         doc["_id"] = str(doc["_id"])
 
-    logger.info("Auto-scorer found %d new transaction(s) to score", len(new_documents))
+    logger.info("Auto-scorer found %d new transaction(s)", len(new_documents))
 
-    predictions, _summary = score_batch_documents(new_documents)
+    # 1. Aggregate raw transactions into subscriber profiles
+    profile_docs = build_subscriber_profiles_from_transactions(new_documents)
+
+    # 2. Save / update subscriber profiles in `subscriber_profile` collection
+    saved_profiles = transaction_repository.save_subscriber_profiles(
+        profile_docs, collection_name="subscriber_profile"
+    )
+    logger.info("Auto-scorer updated %d subscriber profile(s) in subscriber_profile collection", saved_profiles)
+
+    # 3. Score the updated subscriber profiles
+    predictions, _summary = score_batch_documents(profile_docs)
 
     now = datetime.now(timezone.utc)
     storage_docs = to_storage_documents(predictions, timestamp=now)
+
+    # Attach document_ids from new transactions so poller knows they are processed
+    for idx, storage_doc in enumerate(storage_docs):
+        if idx < len(new_documents):
+            storage_doc["document_id"] = str(new_documents[idx]["_id"])
 
     saved_count = prediction_repository.save_predictions(storage_docs)
     logger.info("Auto-scorer saved %d new predictions to fraud_predictions", saved_count)

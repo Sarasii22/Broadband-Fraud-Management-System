@@ -5,20 +5,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 class TransactionRecord(BaseModel):
     """
-    Subscriber profile model.
-
-    Example MongoDB document:
-
-    {
-        "_id": "6a619e8e4c68c3159bc70dca",
-        "subscriber_id": "SUB_2922DC01",
-        "total_download_mb": 562.61,
-        "total_upload_mb": 44.52,
-        "total_usage_mb": 607.14,
-        "avg_usage_mb": 67.46,
-        "max_usage_mb": 120.76,
-        "Number_of_sessions": 9
-    }
+    Subscriber profile / raw transaction model.
     """
 
     id: Optional[str] = Field(
@@ -69,21 +56,50 @@ class TransactionRecord(BaseModel):
         description="Total number of sessions"
     )
 
+    # Raw transaction table fields
+    record_opening_time: Optional[Any] = Field(default=None)
+    record_closing_time: Optional[Any] = Field(default=None)
+    cc_total_octets_bytes: Optional[int] = Field(default=None)
+    cc_input_octets_bytes: Optional[int] = Field(default=None)
+    cc_output_octets_bytes: Optional[int] = Field(default=None)
+    load_date: Optional[Any] = Field(default=None)
+    mac_address: Optional[str] = Field(default=None)
 
     model_config = ConfigDict(
-        populate_by_name=True
+        populate_by_name=True,
+        protected_namespaces=()
     )
-
 
     def to_scoring_payload(self) -> Dict[str, Any]:
         """
-        Convert subscriber profile into ML model input format.
+        Convert subscriber profile or raw transaction record into ML model input format.
         """
+        raw_sum = (self.cc_input_octets_bytes or 0) + (self.cc_output_octets_bytes or 0)
+        has_octets = (
+            self.cc_total_octets_bytes is not None
+            or self.cc_input_octets_bytes is not None
+            or self.cc_output_octets_bytes is not None
+        )
+        usage_bytes = max(self.cc_total_octets_bytes or 0, raw_sum) if has_octets else None
+
+        computed_mb = round(usage_bytes / (1024 * 1024), 4) if usage_bytes is not None else None
+
+        total_download = (
+            self.total_download_mb
+            if self.total_download_mb is not None
+            else (round((self.cc_input_octets_bytes or 0) / (1024 * 1024), 4) if self.cc_input_octets_bytes is not None else 0.0)
+        )
+
+        total_upload = (
+            self.total_upload_mb
+            if self.total_upload_mb is not None
+            else (round((self.cc_output_octets_bytes or 0) / (1024 * 1024), 4) if self.cc_output_octets_bytes is not None else 0.0)
+        )
 
         total_usage = (
             self.total_usage_mb
             if self.total_usage_mb is not None
-            else 0
+            else (computed_mb if computed_mb is not None else (total_download + total_upload))
         )
 
         avg_usage = (
@@ -92,21 +108,42 @@ class TransactionRecord(BaseModel):
             else total_usage
         )
 
+        max_usage = (
+            self.max_usage_mb
+            if self.max_usage_mb is not None
+            else total_usage
+        )
+
         sessions = (
             self.Number_of_sessions
             if self.Number_of_sessions is not None
-            else 0
+            else 1
         )
+
+        login_hour = 0
+        if self.record_opening_time:
+            if isinstance(self.record_opening_time, datetime):
+                login_hour = self.record_opening_time.hour
+            elif isinstance(self.record_opening_time, str):
+                try:
+                    dt = datetime.fromisoformat(self.record_opening_time)
+                    login_hour = dt.hour
+                except ValueError:
+                    login_hour = 0
+
+        mac_addr = self.mac_address or self.subscriber_id
 
         return {
             "subscriber_id": self.subscriber_id,
-            "total_download_mb": self.total_download_mb or 0,
-            "total_upload_mb": self.total_upload_mb or 0,
+            "total_download_mb": total_download,
+            "total_upload_mb": total_upload,
             "total_usage_mb": total_usage,
+            "usage_mb": total_usage,
             "avg_usage_mb": avg_usage,
-            "max_usage_mb": self.max_usage_mb or 0,
+            "max_usage_mb": max_usage,
             "Number_of_sessions": sessions,
-
+            "login_hour": login_hour,
+            "mac_address": mac_addr,
         }
 
 class BatchPredictionRequest(BaseModel):
@@ -125,26 +162,30 @@ class BatchPredictionRequest(BaseModel):
         description="Maximum number of matching documents to score. Omit to score all matching records.",
     )
 
-
 class BatchPredictionItem(BaseModel):
     document_id: Optional[str] = None
     subscriber_id: str
-    label: int
+    is_fraud: bool = False
+    label: int = 0
     rule_score: float
-    fraud_score: float
-    raw_score: float
+    fraud_score: float = 0.0
+    ml_score: float = 0.0
+    raw_score: float = 0.0
     final_score: float
     decision: str
-    triggered_rules: List[str]
-    model_version: str
+    triggered_rules: List[str] = Field(default_factory=list)
+    model_version: str = "v1.0.0"
 
+    model_config = ConfigDict(protected_namespaces=())
 
 class BatchPredictionSummary(BaseModel):
     total_records: int
     fraud_count: int
-    normal_count: int
+    normal_count: int = 0
+    not_fraud_count: int = 0
     average_rule_score: float
-    average_fraud_score: float
+    average_fraud_score: float = 0.0
+    average_ml_score: float = 0.0
     average_final_score: float
 
 
@@ -169,15 +210,19 @@ class TimeRangeStatsRequest(BaseModel):
 
 
 class FraudRecordSummary(BaseModel):
-    subscriber_id: str
-    label: int
-    decision: str
-    final_score: float
-    rule_score: float
-    fraud_score: float
-    raw_score: float
-    triggered_rules: List[str]
-    created_at: datetime
+    subscriber_id: str = "UNKNOWN"
+    is_fraud: bool = False
+    label: int = 0
+    decision: str = "ALLOW"
+    final_score: float = 0.0
+    rule_score: float = 0.0
+    fraud_score: float = 0.0
+    ml_score: float = 0.0
+    raw_score: float = 0.0
+    triggered_rules: List[str] = Field(default_factory=list)
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class TriggeredRuleStat(BaseModel):

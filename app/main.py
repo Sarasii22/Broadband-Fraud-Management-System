@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
@@ -16,7 +17,11 @@ from app.models.schemas import (
     TriggeredRuleStat,
 )
 from app.core.logging import setup_logging
-from app.services.batch import score_batch_documents, to_storage_documents
+from app.services.batch import (
+    build_subscriber_profiles_from_transactions,
+    score_batch_documents,
+    to_storage_documents,
+)
 from app.services.ml import MODEL_VERSION, get_model
 from app.services.report import build_pdf_report
 from app.services.auto_scorer import start_auto_scorer, stop_auto_scorer
@@ -24,35 +29,28 @@ import os
 
 logger = setup_logging()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    get_model()
+    logger.info("IsolationForest model loaded, version=%s", MODEL_VERSION)
+
+    MongoPredictionRepository().ensure_indexes()
+    logger.info("Ensured indexes on fraud_predictions collection")
+
+    start_auto_scorer()
+    yield
+    stop_auto_scorer()
+
 app = FastAPI(
     title="Broadband Fraud Batch API",
     description="MongoDB-backed batch fraud scoring for broadband accounts",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
-@app.on_event("startup")
-def load_model_on_startup():
-    get_model()
-    logger.info("XGBoost model loaded, version=%s", MODEL_VERSION)
-
-    MongoPredictionRepository().ensure_indexes()
-    logger.info("Ensured indexes on fraud_predictions collection")
-
-    # Start the background poller: it watches `transactions` for any
-    # documents that don't have a corresponding fraud_predictions entry
-    # yet, scores them, and saves the result — automatically, without
-    # needing a manual POST /predict call.
-    start_auto_scorer()
-
-
-@app.on_event("shutdown")
-def stop_background_workers():
-    stop_auto_scorer()
 
 
 @app.get("/")
@@ -78,7 +76,11 @@ def predict_batch(request: BatchPredictionRequest):
             skip=request.skip,
             limit=request.limit,
         )
-        predictions, summary = score_batch_documents(documents)
+
+        profile_docs = build_subscriber_profiles_from_transactions(documents)
+        repository.save_subscriber_profiles(profile_docs, collection_name="subscriber_profile")
+
+        predictions, summary = score_batch_documents(profile_docs if profile_docs else documents)
 
         storage_docs = to_storage_documents(predictions)
         saved_count = prediction_repository.save_predictions(storage_docs)
@@ -97,6 +99,7 @@ def predict_batch(request: BatchPredictionRequest):
 
 
 
+@app.get("/customers/{subscriber_id}", response_model=SubscriberLookupResponse)
 @app.get("/customers/subscriber_id/{subscriber_id}", response_model=SubscriberLookupResponse)
 def get_customer_lookup(subscriber_id: str, limit: int = 10):
     try:
@@ -136,14 +139,21 @@ def _compute_stats(request: TimeRangeStatsRequest) -> TimeRangeStatsResponse:
     )
 
     summary_counts = {item["_id"]: item["count"] for item in result.get("summary", [])}
-    fraud_count = summary_counts.get(True, 0)
-    normal_count = summary_counts.get(False, 0)
+    fraud_count = summary_counts.get(1, 0) + summary_counts.get(True, 0)
+    normal_count = summary_counts.get(0, 0) + summary_counts.get(False, 0)
     total = fraud_count + normal_count
 
     fraud_pct = round((fraud_count / total) * 100, 2) if total else 0.0
     normal_pct = round((normal_count / total) * 100, 2) if total else 0.0
 
-    records = [FraudRecordSummary(**r) for r in result.get("records", [])]
+    raw_records = result.get("records", [])
+    records = []
+    for r in raw_records:
+        if "is_fraud" not in r:
+            r["is_fraud"] = r.get("label") == 1 or r.get("decision") != "ALLOW"
+        if "ml_score" not in r:
+            r["ml_score"] = r.get("fraud_score", 0.0)
+        records.append(FraudRecordSummary(**r))
 
     rule_breakdown = [
         TriggeredRuleStat(

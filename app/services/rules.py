@@ -23,7 +23,13 @@ except ModuleNotFoundError:
     yaml = None
 
 
-CONFIG_PATH = os.path.join(
+CONFIG_PATH_YAML = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "config",
+    "rules.yaml"
+)
+CONFIG_PATH_YML = os.path.join(
     os.path.dirname(__file__),
     "..",
     "config",
@@ -41,45 +47,34 @@ def load_rules() -> Dict:
             "PyYAML is not installed. Install requirements.txt."
         )
 
-    with open(CONFIG_PATH, "r") as file:
+    config_file = CONFIG_PATH_YAML if os.path.exists(CONFIG_PATH_YAML) else CONFIG_PATH_YML
+
+    with open(config_file, "r") as file:
         return yaml.safe_load(file)
 
 
-def rule_based_score(data: dict) -> Tuple[float, List[str]]:
+def rule_based_score(data: dict) -> Tuple[float, List[str], bool]:
     """
     Calculate rule-based fraud score.
-
-    Parameters
-    ----------
-    data : dict
-
-        Example:
-
-        {
-            "total_usage_mb": 900,
-            "total_download_mb": 600,
-            "total_upload_mb": 300,
-            "avg_usage_mb": 120,
-            "max_usage_mb": 450,
-            "Number_of_sessions": 25,
-            "upload_ratio": 6.8,
-            "algorithms_flagged": 4
-        }
 
     Returns
     -------
     normalized_score : float
-        Rule score between 0 and 1
-
     triggered_rules : list
-        List of triggered rule names
+    hard_block : bool
     """
 
     cfg = load_rules()
-
     score = 0
-
     triggered_rules = []
+    hard_block = False
+
+    # Compute derived upload_ratio if not present
+    eval_data = dict(data)
+    if "upload_ratio" not in eval_data:
+        dl = float(eval_data.get("total_download_mb", 0) or 0)
+        ul = float(eval_data.get("total_upload_mb", 0) or 0)
+        eval_data["upload_ratio"] = (ul / dl * 100) if dl > 0 else 0.0
 
     # -------------------------------
     # Rule 01 - Rule 07
@@ -94,38 +89,36 @@ def rule_based_score(data: dict) -> Tuple[float, List[str]]:
         "rule_06",
         "rule_07"
     ]:
-
-        rule = cfg[rule_name]
-
-        feature = rule["feature"]
-
-        if data[feature] > rule["upper_limit"]:
-
-            score += rule["points"]
-
-            triggered_rules.append(rule_name)
+        if rule_name in cfg:
+            rule = cfg[rule_name]
+            feature = rule["feature"]
+            val = float(eval_data.get(feature, 0) or 0)
+            if val > rule["upper_limit"]:
+                score += rule["points"]
+                triggered_rules.append(rule_name)
+                if rule.get("hard_block"):
+                    hard_block = True
 
     # -------------------------------
     # Rule 08
     # -------------------------------
 
     if "rule_08" in cfg:
-
         rule = cfg["rule_08"]
-
-        if data["algorithms_flagged"] >= rule["minimum_algorithms"]:
-
+        algos = int(eval_data.get("algorithms_flagged", 0) or 0)
+        if algos >= rule["minimum_algorithms"]:
             score += rule["points"]
-
             triggered_rules.append("rule_08")
+            if rule.get("hard_block"):
+                hard_block = True
 
     # -------------------------------
     # Normalize Score
     # -------------------------------
 
     normalized_score = min(
-        score / cfg["max_raw_score"],
+        score / cfg.get("max_raw_score", 100),
         1.0
     )
 
-    return normalized_score, triggered_rules
+    return normalized_score, triggered_rules, hard_block

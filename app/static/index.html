@@ -171,16 +171,17 @@
 
       function renderStatsTable(records) {
         statsTableBody.innerHTML = records.map((r) => {
-          const fraudClass = r.is_fraud ? 'fraud-status-fraud' : 'fraud-status-normal';
-          const fraudLabel = r.is_fraud ? 'FRAUD' : 'NOT FRAUD';
+          const isFraud = r.is_fraud || r.label === 1 || r.decision !== 'ALLOW';
+          const fraudClass = isFraud ? 'fraud-status-fraud' : 'fraud-status-normal';
+          const fraudLabel = isFraud ? 'FRAUD' : 'NOT FRAUD';
           return `
             <tr>
-              <td>${r.subscriber_id}</td>
+              <td>${r.subscriber_id || 'UNKNOWN'}</td>
               <td class="${fraudClass}">${fraudLabel}</td>
-              <td>${r.decision}</td>
-              <td>${r.final_score.toFixed(4)}</td>
-              <td>${r.triggered_rules.length ? r.triggered_rules.join(', ') : 'None'}</td>
-              <td>${new Date(r.created_at).toLocaleString()}</td>
+              <td>${r.decision || 'ALLOW'}</td>
+              <td>${Number(r.final_score ?? 0).toFixed(4)}</td>
+              <td>${Array.isArray(r.triggered_rules) && r.triggered_rules.length ? r.triggered_rules.join(', ') : 'None'}</td>
+              <td>${r.created_at ? new Date(r.created_at).toLocaleString() : '--'}</td>
             </tr>
           `;
         }).join('');
@@ -193,21 +194,21 @@
           <tr>
             <td>${transaction._id || '--'}</td>
             <td>${transaction.subscriber_id || '--'}</td>
-            <td>${transaction.usage_mb ?? '--'}</td>
+            <td>${transaction.total_download_mb ?? '--'}</td>
+            <td>${transaction.total_upload_mb ?? '--'}</td>
+            <td>${transaction.total_usage_mb ?? transaction.usage_mb ?? '--'}</td>
             <td>${transaction.avg_usage_mb ?? '--'}</td>
-            <td>${transaction.device_age_days ?? '--'}</td>
-            <td>${transaction.num_devices_30d ?? '--'}</td>
-            <td>${transaction.failed_payments_7d ?? '--'}</td>
-            <td>${transaction.account_age_days ?? '--'}</td>
+            <td>${transaction.max_usage_mb ?? '--'}</td>
+            <td>${transaction.Number_of_sessions ?? '--'}</td>
             <td>${transaction.login_hour ?? '--'}</td>
-            <td>${transaction.distance_from_usual_km ?? '--'}</td>
             <td>${transaction.mac_address || '--'}</td>
           </tr>
         `).join('');
 
         const renderPredictionRows = (predictions) => predictions.map((prediction) => {
-          const fraudClass = prediction.is_fraud ? 'fraud-status-fraud' : 'fraud-status-normal';
-          const fraudLabel = prediction.is_fraud ? 'FRAUD' : 'NOT FRAUD';
+          const isFraud = prediction.is_fraud || prediction.label === 1 || prediction.decision !== 'ALLOW';
+          const fraudClass = isFraud ? 'fraud-status-fraud' : 'fraud-status-normal';
+          const fraudLabel = isFraud ? 'FRAUD' : 'NOT FRAUD';
           return `
             <tr>
               <td>${prediction._id || '--'}</td>
@@ -216,7 +217,7 @@
               <td>${prediction.decision || '--'}</td>
               <td>${Number(prediction.final_score ?? 0).toFixed(4)}</td>
               <td>${Number(prediction.rule_score ?? 0).toFixed(4)}</td>
-              <td>${Number(prediction.ml_score ?? 0).toFixed(4)}</td>
+              <td>${Number(prediction.ml_score ?? prediction.fraud_score ?? 0).toFixed(4)}</td>
               <td>${Array.isArray(prediction.triggered_rules) && prediction.triggered_rules.length ? prediction.triggered_rules.join(', ') : 'None'}</td>
               <td>${prediction.created_at ? new Date(prediction.created_at).toLocaleString() : '--'}</td>
             </tr>
@@ -226,21 +227,20 @@
         const transactionTable = records.transactions && records.transactions.length
           ? `
             <div class="customer-data-section">
-              <h4>Raw Data</h4>
+              <h4>Raw Broadband Transaction Data</h4>
               <div class="table-scroll">
                 <table class="customer-data-table">
                   <thead>
                     <tr>
                       <th>Record ID</th>
                       <th>Customer ID</th>
-                      <th>Usage MB</th>
+                      <th>Download MB</th>
+                      <th>Upload MB</th>
+                      <th>Total Usage MB</th>
                       <th>Avg Usage MB</th>
-                      <th>Device Age</th>
-                      <th>Devices 30d</th>
-                      <th>Failed Payments</th>
-                      <th>Account Age</th>
+                      <th>Max Usage MB</th>
+                      <th>Sessions</th>
                       <th>Login Hour</th>
-                      <th>Distance KM</th>
                       <th>MAC Address</th>
                     </tr>
                   </thead>
