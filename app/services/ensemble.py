@@ -1,31 +1,105 @@
 """
-Combines the rule-based score and ML score into one final decision.
+Combines the rule-based score and the Isolation Forest anomaly score
+to produce the final fraud decision.
 
-Strategy: weighted average, with a "hard block" override for rules
-that should never be second-guessed by the ML model (e.g. a device
-that's on a known fraud blacklist).
+Workflow
+
+Rule Engine
+      ↓
+Rule Score (0-1)
+      ↓
+Isolation Forest
+      ↓
+Fraud Score (0-1)
+      ↓
+Weighted Average
+      ↓
+Final Decision
 """
 
 from typing import Dict
 
-RULE_WEIGHT = 0.4
-ML_WEIGHT = 0.6
+# ==========================================================
+# Weights
+# ==========================================================
 
-BLOCK_THRESHOLD = 0.7
-REVIEW_THRESHOLD = 0.4
+RULE_WEIGHT = 0.40
+ML_WEIGHT = 0.60
+
+# ==========================================================
+# Decision Thresholds
+# ==========================================================
+
+BLOCK_THRESHOLD = 0.75
+REVIEW_THRESHOLD = 0.45
 
 
-def ensemble_predict(rule_score: float, ml_score: float, hard_block: bool) -> Dict:
+def ensemble_predict(
+    rule_score: float,
+    fraud_score: float,
+    hard_block: bool = False
+) -> Dict:
+    """
+    Combine rule score and ML fraud score.
+
+    Parameters
+    ----------
+    rule_score : float
+        Score from the rule engine (0-1)
+
+    fraud_score : float
+        Normalized anomaly score from Isolation Forest (0-1)
+
+    hard_block : bool
+        Immediately block if a critical rule is triggered.
+
+    Returns
+    -------
+    {
+        "rule_score": ...,
+        "ml_score": ...,
+        "final_score": ...,
+        "decision": ...
+    }
+    """
+
+    # ------------------------------------------------------
+    # Hard Block
+    # ------------------------------------------------------
+
     if hard_block:
-        return {"final_score": 1.0, "decision": "BLOCK"}
+        return {
+            "rule_score": round(rule_score, 4),
+            "ml_score": round(fraud_score, 4),
+            "final_score": 1.0,
+            "decision": "BLOCK"
+        }
 
-    final_score = (RULE_WEIGHT * rule_score) + (ML_WEIGHT * ml_score)
+    # ------------------------------------------------------
+    # Weighted Score
+    # ------------------------------------------------------
+
+    final_score = (
+        RULE_WEIGHT * rule_score
+        + ML_WEIGHT * fraud_score
+    )
+
+    # ------------------------------------------------------
+    # Final Decision
+    # ------------------------------------------------------
 
     if final_score >= BLOCK_THRESHOLD:
         decision = "BLOCK"
+
     elif final_score >= REVIEW_THRESHOLD:
         decision = "REVIEW"
+
     else:
         decision = "ALLOW"
 
-    return {"final_score": round(final_score, 4), "decision": decision}
+    return {
+        "rule_score": round(rule_score, 4),
+        "ml_score": round(fraud_score, 4),
+        "final_score": round(final_score, 4),
+        "decision": decision
+    }

@@ -9,7 +9,7 @@ def test_build_batch_summary_counts_and_averages():
     predictions = [
         BatchPredictionItem(
             document_id="1",
-            customer_id="CUST-1",
+            subscriber_id="SUB-1",
             is_fraud=False,
             rule_score=0.2,
             ml_score=0.4,
@@ -20,7 +20,7 @@ def test_build_batch_summary_counts_and_averages():
         ),
         BatchPredictionItem(
             document_id="2",
-            customer_id="CUST-2",
+            subscriber_id="SUB-2",
             is_fraud=True,
             rule_score=0.8,
             ml_score=0.9,
@@ -31,7 +31,7 @@ def test_build_batch_summary_counts_and_averages():
         ),
         BatchPredictionItem(
             document_id="3",
-            customer_id="CUST-3",
+            subscriber_id="SUB-3",
             is_fraud=True,
             rule_score=0.5,
             ml_score=0.6,
@@ -53,9 +53,9 @@ def test_build_batch_summary_counts_and_averages():
 
 
 def test_batch_endpoint_returns_summary_and_predictions(monkeypatch):
-    fake_documents = [{"_id": "mongo-1", "customer_id": "CUST-100"}]
+    fake_documents = [{"_id": "mongo-1", "subscriber_id": "SUB-100"}]
 
-    def fake_fetch_transactions(self, collection_name=None, customer_id=None, skip=0, limit=None):
+    def fake_fetch_transactions(self, collection_name=None, subscriber_id=None, skip=0, limit=None):
         return fake_documents
 
     monkeypatch.setattr("app.main.get_model", lambda: None)
@@ -66,7 +66,7 @@ def test_batch_endpoint_returns_summary_and_predictions(monkeypatch):
             [
                 BatchPredictionItem(
                     document_id="mongo-1",
-                    customer_id="CUST-100",
+                    subscriber_id="SUB-100",
                     is_fraud=False,
                     rule_score=0.1,
                     ml_score=0.2,
@@ -80,7 +80,7 @@ def test_batch_endpoint_returns_summary_and_predictions(monkeypatch):
                 [
                     BatchPredictionItem(
                         document_id="mongo-1",
-                        customer_id="CUST-100",
+                        subscriber_id="SUB-100",
                         is_fraud=False,
                         rule_score=0.1,
                         ml_score=0.2,
@@ -103,5 +103,5 @@ def test_batch_endpoint_returns_summary_and_predictions(monkeypatch):
     assert payload["matched_count"] == 1
     assert payload["summary"]["total_records"] == 1
     assert payload["summary"]["not_fraud_count"] == 1
-    assert payload["predictions"][0]["customer_id"] == "CUST-100"
+    assert payload["predictions"][0]["subscriber_id"] == "SUB-100"
     assert payload["predictions"][0]["is_fraud"] is False

@@ -1,42 +1,79 @@
 """
-Feature engineering shared between offline training (training/train_model.py)
-and online inference (app/services/ml.py).
+Shared feature engineering for subscriber-level anomaly detection.
 
-Keeping this in one place guarantees the model always sees features
-computed the exact same way it was trained on.
+This module is used by both
+
+1. Offline model training
+2. Online prediction
+
+Keeping preprocessing here guarantees that the prediction data is
+prepared exactly the same way as the training data.
 """
 
 from typing import Any
 
 try:
     import pandas as pd
-except ModuleNotFoundError:  # pragma: no cover - exercised only when the dependency is absent locally
+except ModuleNotFoundError:
     pd = None
 
+
+# Features used by the Isolation Forest model
 FEATURE_COLUMNS = [
-    "usage_ratio",
-    "device_age_days",
-    "num_devices_30d",
-    "failed_payments_7d",
-    "account_age_days",
-    "is_odd_hour",
-    "distance_from_usual_km",
+    "total_download_mb",
+    "total_upload_mb",
+    "total_usage_mb",
+    "avg_usage_mb",
+    "max_usage_mb",
+    "Number_of_sessions",
 ]
 
 
 def build_features(data: dict) -> Any:
+    """
+    Convert a subscriber JSON record into the DataFrame expected
+    by the scaler and Isolation Forest model.
+
+    Parameters
+    ----------
+    data : dict
+
+    Example
+    -------
+    {
+        "subscriber_id":"SUB_001",
+        "total_download_mb":465,
+        "total_upload_mb":29,
+        "total_usage_mb":495,
+        "avg_usage_mb":61,
+        "max_usage_mb":116,
+        "Number_of_sessions":8
+    }
+
+    Returns
+    -------
+    pandas.DataFrame
+    """
+
     if pd is None:
-        raise RuntimeError("pandas is not installed. Install requirements.txt to use ML scoring.")
-    usage_ratio = data["usage_mb"] / data["avg_usage_mb"] if data["avg_usage_mb"] > 0 else 0.0
-    is_odd_hour = 1 if data["login_hour"] <= 5 or data["login_hour"] >= 23 else 0
+        raise RuntimeError(
+            "Pandas is not installed. Install requirements.txt first."
+        )
 
     row = {
-        "usage_ratio": usage_ratio,
-        "device_age_days": data["device_age_days"],
-        "num_devices_30d": data["num_devices_30d"],
-        "failed_payments_7d": data["failed_payments_7d"],
-        "account_age_days": data["account_age_days"],
-        "is_odd_hour": is_odd_hour,
-        "distance_from_usual_km": data["distance_from_usual_km"],
+        "subscriber_id": data["subscriber_id"],
+        "total_download_mb": float(data["total_download_mb"]),
+        "total_upload_mb": float(data["total_upload_mb"]),
+        "total_usage_mb": float(data["total_usage_mb"]),
+        "avg_usage_mb": float(data["avg_usage_mb"]),
+        "max_usage_mb": float(data["max_usage_mb"]),
+        "Number_of_sessions": int(data["Number_of_sessions"]),
     }
-    return pd.DataFrame([row], columns=FEATURE_COLUMNS)
+
+    df = pd.DataFrame([row])
+
+    # subscriber_id is NOT a model feature.
+    # It is only used as an identifier.
+    df = df.set_index("subscriber_id")
+
+    return df[FEATURE_COLUMNS]

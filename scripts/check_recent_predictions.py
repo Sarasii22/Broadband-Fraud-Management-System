@@ -12,4 +12,4 @@ collection = db["fraud_predictions"]
 
 print("Most recent 5 predictions (created_at is TRUE UTC time):\n")
 for doc in collection.find().sort("created_at", -1).limit(5):
-    print(f"  customer_id={doc.get('customer_id'):<18} created_at (UTC) = {doc.get('created_at')}")
+    print(f"  subscriber_id={doc.get('subscriber_id'):<18} created_at (UTC) = {doc.get('created_at')}")

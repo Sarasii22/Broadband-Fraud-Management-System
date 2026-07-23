@@ -15,9 +15,9 @@ def score_transaction(data: dict) -> Dict:
     result = ensemble_predict(rule_score, model_score, hard_block)
 
     return {
-        "customer_id": data["customer_id"],
+        "subscriber_id": data["subscriber_id"],
         "rule_score": round(rule_score, 4),
-        "ml_score": round(model_score, 4),
+        "fraud_score": round(model_score, 4),
         "final_score": result["final_score"],
         "decision": result["decision"],
         "triggered_rules": triggered_rules,

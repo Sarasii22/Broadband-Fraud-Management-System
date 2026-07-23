@@ -66,8 +66,8 @@
 
             <form id="customer-search-form" class="customer-search-form">
               <label>
-                Customer ID
-                <input type="text" name="customer_id" id="customer-search-input" placeholder="e.g. CUST-10293" />
+                Subscriber ID
+                <input type="text" name="subscriber_id" id="customer-search-input" placeholder="e.g. CUST-10293" />
               </label>
               <div class="customer-search-actions">
                 <button type="submit">Show Record</button>
@@ -175,7 +175,7 @@
           const fraudLabel = r.is_fraud ? 'FRAUD' : 'NOT FRAUD';
           return `
             <tr>
-              <td>${r.customer_id}</td>
+              <td>${r.subscriber_id}</td>
               <td class="${fraudClass}">${fraudLabel}</td>
               <td>${r.decision}</td>
               <td>${r.final_score.toFixed(4)}</td>
@@ -192,7 +192,7 @@
         const renderTransactionRows = (transactions) => transactions.map((transaction) => `
           <tr>
             <td>${transaction._id || '--'}</td>
-            <td>${transaction.customer_id || '--'}</td>
+            <td>${transaction.subscriber_id || '--'}</td>
             <td>${transaction.usage_mb ?? '--'}</td>
             <td>${transaction.avg_usage_mb ?? '--'}</td>
             <td>${transaction.device_age_days ?? '--'}</td>
@@ -211,7 +211,7 @@
           return `
             <tr>
               <td>${prediction._id || '--'}</td>
-              <td>${prediction.customer_id || '--'}</td>
+              <td>${prediction.subscriber_id || '--'}</td>
               <td class="${fraudClass}">${fraudLabel}</td>
               <td>${prediction.decision || '--'}</td>
               <td>${Number(prediction.final_score ?? 0).toFixed(4)}</td>

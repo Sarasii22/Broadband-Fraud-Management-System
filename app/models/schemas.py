@@ -3,65 +3,120 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-
 class TransactionRecord(BaseModel):
-    id: Optional[str] = Field(default=None, alias="_id", description="MongoDB document id")
+    """
+    Subscriber profile model.
+
+    Example MongoDB document:
+
+    {
+        "_id": "6a619e8e4c68c3159bc70dca",
+        "subscriber_id": "SUB_2922DC01",
+        "total_download_mb": 562.61,
+        "total_upload_mb": 44.52,
+        "total_usage_mb": 607.14,
+        "avg_usage_mb": 67.46,
+        "max_usage_mb": 120.76,
+        "Number_of_sessions": 9
+    }
+    """
+
+    id: Optional[str] = Field(
+        default=None,
+        alias="_id",
+        description="MongoDB document id"
+    )
+
     subscriber_id: str = Field(
         ...,
-        validation_alias=AliasChoices("subscriber_id", "customer_id"),
-        description="Unique subscriber identifier",
+        validation_alias=AliasChoices("subscriber_id", "subscriber_id"),
+        description="Unique subscriber identifier"
     )
-    record_opening_time: Optional[datetime] = Field(default=None, description="Session start time")
-    record_closing_time: Optional[datetime] = Field(default=None, description="Session end time")
-    cc_total_octets_bytes: Optional[int] = Field(default=None, ge=0, description="Total octets in bytes")
-    cc_input_octets_bytes: Optional[int] = Field(default=None, ge=0, description="Input octets in bytes")
-    cc_output_octets_bytes: Optional[int] = Field(default=None, ge=0, description="Output octets in bytes")
-    load_date: Optional[datetime] = Field(default=None, description="Ingestion timestamp")
 
-    usage_mb: Optional[float] = Field(default=None, ge=0, description="Legacy data usage in MB")
-    avg_usage_mb: Optional[float] = Field(default=None, ge=0, description="Legacy 30-day average usage in MB")
-    device_age_days: Optional[int] = Field(default=None, ge=0, description="Days since this device was first seen")
-    num_devices_30d: Optional[int] = Field(default=None, ge=0, description="Distinct devices used in last 30 days")
-    failed_payments_7d: Optional[int] = Field(default=None, ge=0, description="Failed payment attempts in last 7 days")
-    account_age_days: Optional[int] = Field(default=None, ge=0, description="Days since account was created")
-    login_hour: Optional[int] = Field(default=None, ge=0, le=23, description="Hour of day (0-23) of this login/event")
-    distance_from_usual_km: Optional[float] = Field(default=None, ge=0, description="Distance from subscriber's usual location")
-    mac_address: Optional[str] = Field(default=None, description="Device MAC address")
+    total_download_mb: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Total downloaded data in MB"
+    )
 
-    model_config = ConfigDict(populate_by_name=True)
+    total_upload_mb: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Total uploaded data in MB"
+    )
+
+    total_usage_mb: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Total internet usage in MB"
+    )
+
+    avg_usage_mb: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Average usage per session in MB"
+    )
+
+    max_usage_mb: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Maximum usage in a single session"
+    )
+
+    Number_of_sessions: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Total number of sessions"
+    )
+
+
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
+
 
     def to_scoring_payload(self) -> Dict[str, Any]:
-        event_time = self.record_opening_time or self.load_date or self.record_closing_time or datetime.now(timezone.utc)
-        raw_octets = self.cc_total_octets_bytes
-        input_octets = self.cc_input_octets_bytes or 0
-        output_octets = self.cc_output_octets_bytes or 0
-        if raw_octets is None or raw_octets <= 0:
-            raw_octets = input_octets + output_octets
+        """
+        Convert subscriber profile into ML model input format.
+        """
 
-        usage_mb = self.usage_mb if self.usage_mb is not None else round(raw_octets / (1024 * 1024), 4)
+        total_usage = (
+            self.total_usage_mb
+            if self.total_usage_mb is not None
+            else 0
+        )
+
+        avg_usage = (
+            self.avg_usage_mb
+            if self.avg_usage_mb is not None
+            else total_usage
+        )
+
+        sessions = (
+            self.Number_of_sessions
+            if self.Number_of_sessions is not None
+            else 0
+        )
 
         return {
-            "customer_id": self.subscriber_id,
-            "usage_mb": usage_mb,
-            "avg_usage_mb": self.avg_usage_mb if self.avg_usage_mb is not None else usage_mb,
-            "device_age_days": self.device_age_days if self.device_age_days is not None else 0,
-            "num_devices_30d": self.num_devices_30d if self.num_devices_30d is not None else 1,
-            "failed_payments_7d": self.failed_payments_7d if self.failed_payments_7d is not None else 0,
-            "account_age_days": self.account_age_days if self.account_age_days is not None else 0,
-            "login_hour": self.login_hour if self.login_hour is not None else event_time.hour,
-            "distance_from_usual_km": self.distance_from_usual_km if self.distance_from_usual_km is not None else 0.0,
-            "mac_address": self.mac_address if self.mac_address is not None else self.subscriber_id,
-        }
+            "subscriber_id": self.subscriber_id,
+            "total_download_mb": self.total_download_mb or 0,
+            "total_upload_mb": self.total_upload_mb or 0,
+            "total_usage_mb": total_usage,
+            "avg_usage_mb": avg_usage,
+            "max_usage_mb": self.max_usage_mb or 0,
+            "Number_of_sessions": sessions,
 
+        }
 
 class BatchPredictionRequest(BaseModel):
     collection_name: Optional[str] = Field(
         default=None,
         description="MongoDB collection to read transactions from. Uses the configured default when omitted.",
     )
-    customer_id: Optional[str] = Field(
+    subscriber_id: Optional[str] = Field(
         default=None,
-        description="Optional customer filter for the stored dataset.",
+        description="Optional subscriber filter for the stored dataset.",
     )
     skip: int = Field(default=0, ge=0, description="Number of matching documents to skip before scoring.")
     limit: Optional[int] = Field(
@@ -73,10 +128,11 @@ class BatchPredictionRequest(BaseModel):
 
 class BatchPredictionItem(BaseModel):
     document_id: Optional[str] = None
-    customer_id: str
-    is_fraud: bool
+    subscriber_id: str
+    label: int
     rule_score: float
-    ml_score: float
+    fraud_score: float
+    raw_score: float
     final_score: float
     decision: str
     triggered_rules: List[str]
@@ -86,9 +142,9 @@ class BatchPredictionItem(BaseModel):
 class BatchPredictionSummary(BaseModel):
     total_records: int
     fraud_count: int
-    not_fraud_count: int
+    normal_count: int
     average_rule_score: float
-    average_ml_score: float
+    average_fraud_score: float
     average_final_score: float
 
 
@@ -113,12 +169,13 @@ class TimeRangeStatsRequest(BaseModel):
 
 
 class FraudRecordSummary(BaseModel):
-    customer_id: str
-    is_fraud: bool
+    subscriber_id: str
+    label: int
     decision: str
     final_score: float
     rule_score: float
-    ml_score: float
+    fraud_score: float
+    raw_score: float
     triggered_rules: List[str]
     created_at: datetime
 
@@ -146,7 +203,7 @@ class TimeRangeStatsResponse(BaseModel):
     rule_breakdown: List[TriggeredRuleStat] = Field(default_factory=list)
 
 
-class CustomerLookupResponse(BaseModel):
-    customer_id: str
+class SubscriberLookupResponse(BaseModel):
+    subscriber_id: str
     transactions: List[Dict[str, Any]] = Field(default_factory=list)
     predictions: List[Dict[str, Any]] = Field(default_factory=list)

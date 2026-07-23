@@ -226,7 +226,7 @@ def build_pdf_report(
 
             table_data.append(
                 [
-                    Paragraph(str(r.get("customer_id", "")), cell_style),
+                    Paragraph(str(r.get("subscriber_id", "")), cell_style),
                     fraud_status_paragraph,
                     Paragraph(str(r.get("decision", "")), cell_style),
                     Paragraph(f"{r.get('final_score', 0):.4f}", cell_style),

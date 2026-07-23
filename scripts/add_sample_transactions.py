@@ -17,7 +17,7 @@ collection = db["transactions"]
 sample_records = [
     # --- Obvious fraud patterns ---
     {
-        "customer_id": "CUST-TEST-F001",
+        "subscriber_id": "SUB-TEST-F001",
         "usage_mb": 18500.0,
         "avg_usage_mb": 1200.0,
         "device_age_days": 0,
@@ -29,7 +29,7 @@ sample_records = [
         "mac_address": "FF:FF:FF:11:22:33",
     },
     {
-        "customer_id": "CUST-TEST-F002",
+        "subscriber_id": "SUB-TEST-F002",
         "usage_mb": 22000.0,
         "avg_usage_mb": 1500.0,
         "device_age_days": 1,
@@ -42,7 +42,7 @@ sample_records = [
     },
     {
         # Hard-block: blacklisted MAC from your rules.yaml
-        "customer_id": "CUST-TEST-F003",
+        "subscriber_id": "SUB-TEST-F003",
         "usage_mb": 5000.0,
         "avg_usage_mb": 2000.0,
         "device_age_days": 10,
@@ -56,7 +56,7 @@ sample_records = [
 
     # --- Obvious legitimate patterns ---
     {
-        "customer_id": "CUST-TEST-L001",
+        "subscriber_id": "SUB-TEST-L001",
         "usage_mb": 1400.0,
         "avg_usage_mb": 1450.0,
         "device_age_days": 400,
@@ -68,7 +68,7 @@ sample_records = [
         "mac_address": "AA:BB:CC:10:20:30",
     },
     {
-        "customer_id": "CUST-TEST-L002",
+        "subscriber_id": "SUB-TEST-L002",
         "usage_mb": 1800.0,
         "avg_usage_mb": 1700.0,
         "device_age_days": 250,
@@ -82,7 +82,7 @@ sample_records = [
 
     # --- Borderline / REVIEW-ish pattern ---
     {
-        "customer_id": "CUST-TEST-R001",
+        "subscriber_id": "SUB-TEST-R001",
         "usage_mb": 6000.0,
         "avg_usage_mb": 2000.0,
         "device_age_days": 15,
@@ -95,7 +95,7 @@ sample_records = [
     },
 
     {
-        "customer_id": "CUST-TEST-R002",
+        "subscriber_id": "SUB-TEST-R002",
         "usage_mb": 6000.0,
         "avg_usage_mb": 2000.0,
         "device_age_days": 5,
@@ -110,4 +110,4 @@ sample_records = [
 
 result = collection.insert_many(sample_records)
 print(f"Inserted {len(result.inserted_ids)} sample transactions.")
-print("Customer IDs added:", [r["customer_id"] for r in sample_records])
+print("Subscriber IDs added:", [r["subscriber_id"] for r in sample_records])

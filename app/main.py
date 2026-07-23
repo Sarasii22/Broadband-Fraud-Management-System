@@ -9,7 +9,7 @@ from app.db.mongo import (
 from app.models.schemas import (
     BatchPredictionRequest,
     BatchPredictionResponse,
-    CustomerLookupResponse,
+    SubscriberLookupResponse,
     TimeRangeStatsRequest,
     TimeRangeStatsResponse,
     FraudRecordSummary,
@@ -74,7 +74,7 @@ def predict_batch(request: BatchPredictionRequest):
     try:
         documents = repository.fetch_transactions(
             collection_name=request.collection_name,
-            customer_id=request.customer_id,
+            subscriber_id=request.subscriber_id,
             skip=request.skip,
             limit=request.limit,
         )
@@ -96,26 +96,27 @@ def predict_batch(request: BatchPredictionRequest):
     )
 
 
-@app.get("/customers/{customer_id}", response_model=CustomerLookupResponse)
-def get_customer_lookup(customer_id: str, limit: int = 10):
+
+@app.get("/customers/subscriber_id/{subscriber_id}", response_model=SubscriberLookupResponse)
+def get_customer_lookup(subscriber_id: str, limit: int = 10):
     try:
         transaction_repository = MongoTransactionRepository()
         prediction_repository = MongoPredictionRepository()
 
-        transactions = transaction_repository.fetch_transactions_by_customer_id(
-            customer_id=customer_id,
+        transactions = transaction_repository.fetch_transactions_by_subscriber_id(
+            subscriber_id=subscriber_id,
             limit=limit,
         )
-        predictions = prediction_repository.fetch_predictions_by_customer_id(
-            customer_id=customer_id,
+        predictions = prediction_repository.fetch_predictions_by_subscriber_id(
+            subscriber_id=subscriber_id,
             limit=limit,
         )
     except Exception as e:
-        logger.exception("Customer lookup failed for customer_id=%s", customer_id)
+        logger.exception("Customer lookup failed for subscriber_id=%s", subscriber_id)
         raise HTTPException(status_code=500, detail=f"Customer lookup failed: {e}")
 
-    return CustomerLookupResponse(
-        customer_id=customer_id,
+    return SubscriberLookupResponse(
+        subscriber_id=subscriber_id,
         transactions=transactions,
         predictions=predictions,
     )

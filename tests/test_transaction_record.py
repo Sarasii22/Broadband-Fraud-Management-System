@@ -16,7 +16,7 @@ def test_transaction_record_derives_scoring_payload_from_raw_table():
 
     payload = record.to_scoring_payload()
 
-    assert payload["customer_id"] == "SUB_365EECB8"
+    assert payload["subscriber_id"] == "SUB_365EECB8"
     assert payload["usage_mb"] == 0.0077
     assert payload["avg_usage_mb"] == 0.0077
     assert payload["login_hour"] == 11

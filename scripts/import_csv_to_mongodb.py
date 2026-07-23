@@ -36,6 +36,7 @@ def _normalize_transaction_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     rename_map = {
         "subscriber id": "subscriber_id",
+        "customer id": "subscriber_id",
         "record opening time": "record_opening_time",
         "record closing time": "record_closing_time",
         "cc total octets bytes": "cc_total_octets_bytes",
@@ -50,10 +51,8 @@ def _normalize_transaction_columns(df: pd.DataFrame) -> pd.DataFrame:
             df[column] = pd.to_datetime(df[column], errors="coerce")
             df[column] = df[column].apply(lambda value: value.to_pydatetime() if pd.notnull(value) else None)
 
-    if "subscriber_id" in df.columns and "customer_id" not in df.columns:
-        df["customer_id"] = df["subscriber_id"]
-    elif "customer_id" in df.columns and "subscriber_id" not in df.columns:
-        df["subscriber_id"] = df["customer_id"]
+    if "subscriber_id" not in df.columns:
+        raise ValueError("CSV must contain a subscriber_id column.")
 
     numeric_columns = [
         "cc_total_octets_bytes",
